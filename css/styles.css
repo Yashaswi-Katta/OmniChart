@@ -1,0 +1,45 @@
+/* ==========================================================================
+   OmniChart — Global Theme & Utility Styles
+   Design System: 60-30-10 Gunmetal & Amber
+   Base (#0d0e11) · Secondary (#2c3539) · Accent (#ff9f1c)
+   ========================================================================== */
+
+/* ---------- CSS Custom Properties (Design Tokens) ---------- */
+:root {
+  --bg-base: #0d0e11;
+  --bg-sec: #2c3539;
+  --bg-sec-hover: #364146;
+  --border-sec: #3d494f;
+  --accent: #ff9f1c;
+  --accent-hover: #ffb144;
+}
+
+/* ---------- Global Reset & Base ---------- */
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg-base);
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* ---------- Custom Scrollbars ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0d0e11; }
+::-webkit-scrollbar-thumb { background: #3d494f; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #ff9f1c; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ---------- Interactive Genre Chip Animations & Pop-Outs ---------- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
