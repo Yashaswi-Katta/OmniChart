@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OmniChart</title>
 
-  <!-- PWA Manifest -->
+  <!-- Favicon & PWA -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='4' y='3' width='20' height='22' rx='2.5' fill='%230d0e11' stroke='%23ff9f1c' stroke-width='1.8'/%3E%3Cpath d='M9 3V25' stroke='%23ff9f1c' stroke-width='1.5'/%3E%3Ccircle cx='17' cy='14' r='4' fill='%23ff9f1c'/%3E%3Ctext x='17' y='16' text-anchor='middle' fill='%230d0e11' font-size='6' font-weight='bold'%3E%E2%98%85%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#ff9f1c" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -16,6 +17,9 @@
 
   <!-- Theme Styles -->
   <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Supabase Client for Multi-User Cross-Device Sync -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-[#0d0e11] text-slate-100 antialiased selection:bg-[#ff9f1c] selection:text-[#0d0e11]">
 
@@ -117,15 +121,28 @@
             </span>
             <span class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">Bulk</span>
           </button>
+          <div class="border-t border-[#3d494f]/70 my-1.5"></div>
+          <button
+            data-action="open-auth-modal"
+            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-sky-300 hover:bg-sky-500/15 transition mt-0.5"
+          >
+            <span class="flex items-center gap-2.5">
+              <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
+              </svg>
+              Cloud Sync
+            </span>
+            <span id="menuCloudBadge" class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold">Guest</span>
+          </button>
         </div>
       </div>
 
       <!-- Center: Category Pills -->
       <nav id="categoryNav" class="flex items-center gap-1 overflow-x-auto no-scrollbar py-1"></nav>
 
-      <!-- Right: Search + Add Media -->
+      <!-- Right: Search + Auth + Add Media -->
       <div class="flex items-center gap-2">
-        <div class="relative w-44 sm:w-60">
+        <div class="relative w-40 sm:w-56">
           <input
             id="librarySearchInput"
             type="text"
@@ -141,6 +158,16 @@
             class="hidden absolute right-2 top-2 text-slate-400 hover:text-white text-xs"
           >✕</button>
         </div>
+
+        <button
+          id="authBtn"
+          data-action="open-auth-modal"
+          title="Cloud Sync & Multi-Device Access"
+          class="h-9 px-3 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] text-xs font-semibold text-slate-200 flex items-center gap-1.5 shrink-0 transition"
+        >
+          <span id="authBtnIcon">☁️</span>
+          <span id="authBtnLabel" class="hidden sm:inline">Sync</span>
+        </button>
 
         <button
           data-action="open-add-modal"
@@ -630,6 +657,221 @@
         </button>
         <button id="confirmModalActionBtn" data-action="confirm-modal-proceed" class="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow">
           Remove Permanently
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLOUD SYNC & AUTH MODAL -->
+  <div
+    id="authModal"
+    class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+  >
+    <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Modal Header -->
+      <div class="px-5 py-4 border-b border-[#3d494f] flex items-center justify-between bg-[#0d0e11]/60">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">☁️</span>
+          <div>
+            <h3 class="font-bold text-base text-white">OmniChart Cloud Sync</h3>
+            <p class="text-[11px] text-slate-400">Cross-device synchronization &amp; private user libraries</p>
+          </div>
+        </div>
+        <button data-action="close-auth-modal" class="text-slate-400 hover:text-white text-lg leading-none">✕</button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="px-5 pt-3 border-b border-[#3d494f] bg-[#0d0e11]/30 flex gap-2">
+        <button
+          id="authTabAccountBtn"
+          data-action="switch-auth-tab"
+          data-tab="account"
+          class="px-3.5 py-1.5 text-xs font-bold rounded-t-lg bg-[#2c3539] text-[#ff9f1c] border-t border-x border-[#3d494f]"
+        >User Account</button>
+        <button
+          id="authTabSetupBtn"
+          data-action="switch-auth-tab"
+          data-tab="setup"
+          class="px-3.5 py-1.5 text-xs font-semibold rounded-t-lg text-slate-400 hover:text-white"
+        >Database Setup</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 overflow-y-auto space-y-4">
+        
+        <!-- ACCOUNT TAB: LOGGED OUT -->
+        <div id="authLoggedOutView" class="space-y-4">
+          <div class="p-3.5 rounded-xl bg-[#0d0e11] border border-[#3d494f] text-xs text-slate-300 leading-relaxed space-y-1.5">
+            <div class="font-bold text-white flex items-center gap-1.5">
+              <span>📱</span> Multi-Device Realtime Sync
+            </div>
+            <p>
+              Sign in or create a free account to sync your library seamlessly between your phone, tablet, and PC. Every user has their own private, isolated library protected by PostgreSQL Row-Level Security.
+            </p>
+          </div>
+
+          <!-- Auth Form -->
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+              <input
+                id="authEmailInput"
+                type="email"
+                placeholder="you@example.com"
+                class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#ff9f1c]"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+              <input
+                id="authPasswordInput"
+                type="password"
+                placeholder="••••••••"
+                class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#ff9f1c]"
+              />
+            </div>
+
+            <!-- Error Banner -->
+            <div id="authErrorMessage" class="hidden p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300"></div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                id="authSignInBtn"
+                data-action="auth-sign-in"
+                class="h-9 px-4 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
+              >
+                <span>Sign In</span>
+              </button>
+              <button
+                id="authSignUpBtn"
+                data-action="auth-sign-up"
+                class="h-9 px-4 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#ff9f1c]/50 text-[#ff9f1c] font-bold text-xs transition flex items-center justify-center gap-1.5"
+              >
+                <span>Create Account</span>
+              </button>
+            </div>
+          </div>
+
+          <p class="text-[11px] text-slate-400 text-center">
+            Prefer not to sign in? OmniChart works 100% offline using your browser's local storage.
+          </p>
+        </div>
+
+        <!-- ACCOUNT TAB: LOGGED IN -->
+        <div id="authLoggedInView" class="hidden space-y-4">
+          <div class="p-4 rounded-xl bg-[#0d0e11] border border-[#3d494f] space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Signed In</span>
+              <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Live Realtime
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-[#ff9f1c] text-[#0d0e11] font-bold flex items-center justify-center text-sm shadow">
+                👤
+              </div>
+              <div class="min-w-0 flex-1">
+                <div id="authLoggedInEmail" class="font-bold text-sm text-white truncate">user@example.com</div>
+                <div class="text-[11px] text-slate-400">Library changes sync instantly to your cloud database</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <button
+              data-action="auth-upload-local"
+              class="w-full h-9 px-4 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-200 hover:text-white flex items-center justify-between transition"
+            >
+              <span class="flex items-center gap-2">
+                <span>⬆️</span> Upload Local Entries to Cloud
+              </span>
+              <span class="text-[10px] text-slate-400">Backup</span>
+            </button>
+
+            <button
+              data-action="auth-pull-cloud"
+              class="w-full h-9 px-4 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-200 hover:text-white flex items-center justify-between transition"
+            >
+              <span class="flex items-center gap-2">
+                <span>⬇️</span> Pull Latest Cloud Library
+              </span>
+              <span class="text-[10px] text-slate-400">Fetch</span>
+            </button>
+
+            <button
+              data-action="auth-sign-out"
+              class="w-full h-9 px-4 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-rose-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition mt-3"
+            >
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SETUP TAB: SUPABASE CONFIGURATION -->
+        <div id="authSetupView" class="hidden space-y-4">
+          <div class="text-xs text-slate-300 leading-relaxed">
+            Configure your Supabase project credentials. When set in <code class="text-[#ff9f1c] font-mono">js/sync.js</code> or below, anyone using your deployed tracker can create their own account and sync their library.
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Supabase Project URL</label>
+              <input
+                id="cfgSupabaseUrl"
+                type="text"
+                placeholder="https://your-project.supabase.co"
+                class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-[#ff9f1c]"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Supabase Anon Public Key</label>
+              <input
+                id="cfgSupabaseAnonKey"
+                type="password"
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-[#ff9f1c]"
+              />
+            </div>
+            <div class="flex items-center justify-between pt-1">
+              <span id="cfgSaveNotice" class="text-xs text-emerald-400 font-semibold hidden">✓ Saved successfully</span>
+              <button
+                data-action="auth-save-config"
+                class="ml-auto h-8 px-4 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-xs transition shadow"
+              >Save Credentials</button>
+            </div>
+          </div>
+
+          <!-- SQL Schema Guide Accordion -->
+          <div class="border-t border-[#3d494f] pt-3">
+            <details class="group">
+              <summary class="text-xs font-semibold text-[#ff9f1c] cursor-pointer hover:underline flex items-center justify-between">
+                <span>📋 View SQL Table &amp; RLS Setup Script</span>
+                <span class="group-open:rotate-180 transition">▼</span>
+              </summary>
+              <div class="mt-2.5 p-3 rounded-xl bg-[#0d0e11] border border-[#3d494f] space-y-2">
+                <p class="text-[11px] text-slate-400">
+                  Run this in your <strong>Supabase SQL Editor</strong> to create the table and enable multi-user security:
+                </p>
+                <pre id="supabaseSqlCode" class="text-[10px] font-mono text-slate-300 bg-black/60 p-2.5 rounded-lg overflow-x-auto max-h-40 selection:bg-[#ff9f1c] selection:text-[#0d0e11]"></pre>
+                <button
+                  data-action="copy-sql-schema"
+                  class="h-7 px-3 rounded bg-[#2c3539] hover:bg-[#364146] text-slate-200 text-xs font-semibold border border-[#3d494f] flex items-center gap-1 transition"
+                >
+                  <span>Copy SQL Query</span>
+                </button>
+              </div>
+            </details>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3 border-t border-[#3d494f] bg-[#0d0e11]/60 flex items-center justify-between">
+        <span class="text-[11px] text-slate-400">🔒 Zero-knowledge Row-Level Security</span>
+        <button data-action="close-auth-modal" class="h-8 px-4 rounded-lg bg-[#2c3539] hover:bg-[#364146] text-xs font-semibold text-slate-200">
+          Close
         </button>
       </div>
     </div>

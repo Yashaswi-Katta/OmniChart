@@ -232,6 +232,100 @@ function renderNavigation() {
   } else {
     authBadge.classList.add('hidden');
   }
+
+  renderAuthStatus();
+}
+
+// ---------------------------------------------------------------------------
+// Cloud Sync & Multi-User Authentication Engine
+// ---------------------------------------------------------------------------
+
+function renderAuthStatus() {
+  const iconEl  = document.getElementById('authBtnIcon');
+  const labelEl = document.getElementById('authBtnLabel');
+  const badgeEl = document.getElementById('menuCloudBadge');
+
+  if (state.user) {
+    const displayName = state.user.email ? state.user.email.split('@')[0] : 'User';
+    if (iconEl)  iconEl.textContent  = '🟢';
+    if (labelEl) labelEl.textContent = displayName;
+    if (badgeEl) {
+      badgeEl.textContent = 'Synced';
+      badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold';
+    }
+  } else if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured()) {
+    if (iconEl)  iconEl.textContent  = '☁️';
+    if (labelEl) labelEl.textContent = 'Sync';
+    if (badgeEl) {
+      badgeEl.textContent = 'Guest';
+      badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold';
+    }
+  } else {
+    if (iconEl)  iconEl.textContent  = '☁️';
+    if (labelEl) labelEl.textContent = 'Setup';
+    if (badgeEl) {
+      badgeEl.textContent = 'Setup';
+      badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-[#ff9f1c] font-bold';
+    }
+  }
+}
+
+function openAuthModal(activeTab = 'account') {
+  const modal = document.getElementById('authModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+
+  switchAuthTab(activeTab);
+
+  const loggedInView  = document.getElementById('authLoggedInView');
+  const loggedOutView = document.getElementById('authLoggedOutView');
+  const errEl         = document.getElementById('authErrorMessage');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (state.user) {
+    if (loggedInView)  loggedInView.classList.remove('hidden');
+    if (loggedOutView) loggedOutView.classList.add('hidden');
+    const emailEl = document.getElementById('authLoggedInEmail');
+    if (emailEl) emailEl.textContent = state.user.email;
+  } else {
+    if (loggedInView)  loggedInView.classList.add('hidden');
+    if (loggedOutView) loggedOutView.classList.remove('hidden');
+    const pwdInput = document.getElementById('authPasswordInput');
+    if (pwdInput) pwdInput.value = '';
+  }
+
+  // Populate config tab inputs
+  if (typeof CloudSync !== 'undefined') {
+    const cfgUrl = document.getElementById('cfgSupabaseUrl');
+    const cfgKey = document.getElementById('cfgSupabaseAnonKey');
+    const sqlEl  = document.getElementById('supabaseSqlCode');
+    if (cfgUrl) cfgUrl.value = CloudSync.getUrl();
+    if (cfgKey) cfgKey.value = CloudSync.getAnonKey();
+    if (sqlEl)  sqlEl.textContent = CloudSync.getSqlSchema();
+  }
+}
+
+function switchAuthTab(tab) {
+  state.authTab = tab;
+  const tabAccountBtn = document.getElementById('authTabAccountBtn');
+  const tabSetupBtn   = document.getElementById('authTabSetupBtn');
+  const accountView   = state.user ? document.getElementById('authLoggedInView') : document.getElementById('authLoggedOutView');
+  const setupView     = document.getElementById('authSetupView');
+
+  const activeCls   = 'px-3.5 py-1.5 text-xs font-bold rounded-t-lg bg-[#2c3539] text-[#ff9f1c] border-t border-x border-[#3d494f]';
+  const inactiveCls = 'px-3.5 py-1.5 text-xs font-semibold rounded-t-lg text-slate-400 hover:text-white';
+
+  if (tab === 'account') {
+    if (tabAccountBtn) tabAccountBtn.className = activeCls;
+    if (tabSetupBtn)   tabSetupBtn.className   = inactiveCls;
+    if (setupView)     setupView.classList.add('hidden');
+    if (accountView)   accountView.classList.remove('hidden');
+  } else {
+    if (tabAccountBtn) tabAccountBtn.className = inactiveCls;
+    if (tabSetupBtn)   tabSetupBtn.className   = activeCls;
+    if (accountView)   accountView.classList.add('hidden');
+    if (setupView)     setupView.classList.remove('hidden');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1217,6 +1311,9 @@ document.addEventListener('click', (e) => {
     state.items = state.items.filter((i) => i.id !== id);
     state.selectedIds.delete(id);
     saveItems();
+    if (typeof CloudSync !== 'undefined' && CloudSync.deleteItem) {
+      CloudSync.deleteItem(id);
+    }
     renderAll();
     showToast('Entry removed');
   } else if (action === 'step-progress') {
@@ -1474,6 +1571,102 @@ document.addEventListener('click', (e) => {
     const clr = document.getElementById('clearGenreSearchBtn');
     if (clr) clr.classList.add('hidden');
     renderGenreView();
+  } else if (action === 'open-auth-modal') {
+    openAuthModal();
+  } else if (action === 'close-auth-modal') {
+    document.getElementById('authModal').classList.add('hidden');
+  } else if (action === 'switch-auth-tab') {
+    switchAuthTab(btn.dataset.tab);
+  } else if (action === 'auth-sign-in') {
+    const email = document.getElementById('authEmailInput')?.value;
+    const pwd   = document.getElementById('authPasswordInput')?.value;
+    const errEl = document.getElementById('authErrorMessage');
+    if (!email || !pwd) {
+      if (errEl) { errEl.textContent = 'Please enter both email and password.'; errEl.classList.remove('hidden'); }
+      return;
+    }
+    btn.disabled = true;
+    const origText = btn.innerHTML;
+    btn.textContent = 'Signing In...';
+    try {
+      await CloudSync.signIn(email, pwd);
+      document.getElementById('authModal').classList.add('hidden');
+      showToast(`Signed in as ${email}`);
+    } catch (err) {
+      if (errEl) { errEl.textContent = err.message || 'Failed to sign in'; errEl.classList.remove('hidden'); }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  } else if (action === 'auth-sign-up') {
+    const email = document.getElementById('authEmailInput')?.value;
+    const pwd   = document.getElementById('authPasswordInput')?.value;
+    const errEl = document.getElementById('authErrorMessage');
+    if (!email || !pwd) {
+      if (errEl) { errEl.textContent = 'Please enter both email and password.'; errEl.classList.remove('hidden'); }
+      return;
+    }
+    if (pwd.length < 6) {
+      if (errEl) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.classList.remove('hidden'); }
+      return;
+    }
+    btn.disabled = true;
+    const origText = btn.innerHTML;
+    btn.textContent = 'Creating...';
+    try {
+      const data = await CloudSync.signUp(email, pwd);
+      if (data.session) {
+        document.getElementById('authModal').classList.add('hidden');
+        showToast('Account created & signed in!');
+      } else {
+        showToast('Account created! Please check your email to verify if required.');
+        document.getElementById('authModal').classList.add('hidden');
+      }
+    } catch (err) {
+      if (errEl) { errEl.textContent = err.message || 'Failed to create account'; errEl.classList.remove('hidden'); }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  } else if (action === 'auth-sign-out') {
+    await CloudSync.signOut();
+    document.getElementById('authModal').classList.add('hidden');
+    showToast('Signed out. Switched to offline guest mode.');
+  } else if (action === 'auth-upload-local') {
+    if (!state.user) return;
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+    await CloudSync.push(state.items);
+    btn.disabled = false;
+    btn.innerHTML = '<span>⬆️</span> Upload Local Entries to Cloud';
+    showToast(`Uploaded ${state.items.length} entries to your cloud account!`);
+  } else if (action === 'auth-pull-cloud') {
+    if (!state.user) return;
+    btn.disabled = true;
+    btn.textContent = 'Fetching...';
+    const remote = await CloudSync.pull();
+    btn.disabled = false;
+    btn.innerHTML = '<span>⬇️</span> Pull Latest Cloud Library';
+    if (remote) {
+      state.items = remote;
+      saveItems(false);
+      renderAll();
+      showToast(`Fetched ${remote.length} entries from cloud!`);
+    }
+  } else if (action === 'auth-save-config') {
+    const url = document.getElementById('cfgSupabaseUrl')?.value;
+    const key = document.getElementById('cfgSupabaseAnonKey')?.value;
+    CloudSync.saveCredentials(url, key);
+    const notice = document.getElementById('cfgSaveNotice');
+    if (notice) {
+      notice.classList.remove('hidden');
+      setTimeout(() => notice.classList.add('hidden'), 3000);
+    }
+    renderAuthStatus();
+    showToast('Supabase credentials saved!');
+  } else if (action === 'copy-sql-schema') {
+    navigator.clipboard.writeText(CloudSync.getSqlSchema());
+    showToast('SQL schema copied to clipboard!');
   }
 });
 
@@ -1614,6 +1807,10 @@ if (genreSortSelect) {
 
 loadItems();
 renderAll();
+
+if (typeof CloudSync !== 'undefined' && CloudSync.init) {
+  CloudSync.init();
+}
 
 if (state.items.some((i) => !isBrokenTitle(i.title) && (i.studio === 'Unknown Studio' || !i.synopsis || i.releaseDate === 'TBA'))) {
   enrichMissingMetadata(false);

@@ -122,21 +122,26 @@ const OMNICHART_CONFIG = {
 
 ---
 
-## ☁️ Cross-Device Cloud Sync Setup
+## ☁️ Cross-Device Cloud Sync & Multi-User Setup (Supabase)
 
-OmniChart provides a clean, pre-built abstraction layer in `js/sync.js`. Follow either guide below to synchronize your media tracker across your phone, tablet, and PC.
+OmniChart includes a full multi-user authentication and database synchronization engine powered by **Supabase**.
 
-### 🐘 Option A: Supabase (Recommended)
+- **📱 Multi-Device Realtime Sync**: Update an episode or rating on your phone, and your laptop or tablet reflects the changes instantly.
+- **👥 Multi-User Privacy**: Anyone who visits your deployed tracker can create their own account — each user's library is completely private and protected by PostgreSQL Row-Level Security (`auth.uid() = user_id`).
+- **📴 Offline / Guest Mode**: Users who prefer not to create an account can continue using OmniChart 100% offline via local storage.
 
-1. **Add the Supabase CDN script** to `index.html` inside the `<head>`:
-   ```html
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-   ```
+### Quick 3-Step Setup
 
-2. **Execute the SQL Table Creation script** in your Supabase SQL Editor:
+1. **Create a Free Supabase Project**:
+   Sign up at [supabase.com](https://supabase.com) and create a free project.
+
+2. **Run the SQL Table & Security Script**:
+   Go to the **SQL Editor** in your Supabase dashboard and run:
+
    ```sql
-   CREATE TABLE public.omnichart_items (
-       id TEXT PRIMARY KEY,
+   CREATE TABLE IF NOT EXISTS public.omnichart_items (
+       id TEXT NOT NULL,
+       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
        title TEXT NOT NULL,
        category TEXT DEFAULT 'Series & Anime',
        status TEXT DEFAULT 'Completed',
@@ -151,32 +156,48 @@ OmniChart provides a clean, pre-built abstraction layer in `js/sync.js`. Follow 
        image TEXT DEFAULT '',
        synopsis TEXT DEFAULT '',
        notes TEXT DEFAULT '',
-       updated_at BIGINT DEFAULT (extract(epoch from now()) * 1000)
+       updated_at BIGINT DEFAULT (extract(epoch from now()) * 1000),
+       PRIMARY KEY (id, user_id)
    );
 
-   -- Enable Row Level Security
+   -- Enable Row-Level Security (RLS)
    ALTER TABLE public.omnichart_items ENABLE ROW LEVEL SECURITY;
 
-   -- Allow anyone to read items (for public showcase)
-   CREATE POLICY "Allow public read" ON public.omnichart_items
-       FOR SELECT USING (true);
+   -- Security Policies: Users can ONLY see, insert, update and delete their own items
+   CREATE POLICY "Users can select own items"
+       ON public.omnichart_items FOR SELECT
+       USING (auth.uid() = user_id);
 
-   -- Allow insert/update/delete with anon key
-   CREATE POLICY "Allow write access" ON public.omnichart_items
-       FOR ALL USING (true);
+   CREATE POLICY "Users can insert own items"
+       ON public.omnichart_items FOR INSERT
+       WITH CHECK (auth.uid() = user_id);
+
+   CREATE POLICY "Users can update own items"
+       ON public.omnichart_items FOR UPDATE
+       USING (auth.uid() = user_id)
+       WITH CHECK (auth.uid() = user_id);
+
+   CREATE POLICY "Users can delete own items"
+       ON public.omnichart_items FOR DELETE
+       USING (auth.uid() = user_id);
+
+   -- Enable Realtime broadcast
+   ALTER PUBLICATION supabase_realtime ADD TABLE public.omnichart_items;
    ```
 
-3. **Configure credentials** in [`js/sync.js`](file:///c:/Projects/OmniChart/js/sync.js):
+3. **Configure Your Credentials**:
+   In [`js/sync.js`](file:///c:/Projects/OmniChart/js/sync.js), fill your `url` and `anonKey` (from Project Settings → API):
    ```javascript
    const OMNICHART_CONFIG = {
      cloudProvider: 'supabase',
      supabase: {
-       url: 'https://YOUR_PROJECT_ID.supabase.co',
+       url: 'https://YOUR_PROJECT.supabase.co',
        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
        tableName: 'omnichart_items'
      }
    };
    ```
+   *(Alternatively, credentials can be set directly in the browser via **☁️ Sync → Database Setup**).*
 
 ### 🔥 Option B: Firebase Firestore
 

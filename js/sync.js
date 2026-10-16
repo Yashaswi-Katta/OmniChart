@@ -64,7 +64,10 @@ const state = window.state = {
   calYear:             new Date().getFullYear(),
   calMonth:            new Date().getMonth(),
   genreSort:           'count-desc',
-  genreSearch:         ''
+  genreSearch:         '',
+  user:                null,
+  cloudStatus:         'offline',
+  authTab:             'account'
 };
 
 // ---------------------------------------------------------------------------
@@ -243,13 +246,13 @@ function loadItems() {
   saveItems();
 }
 
-function saveItems() {
+function saveItems(shouldPushCloud = true) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
   } catch (e) {}
 
-  // Push to cloud if active and user is owner
-  if (OMNICHART_CONFIG.cloudProvider !== 'localStorage' && OwnerMode.isOwner()) {
+  // Push to cloud if user is signed in or cloud sync is configured
+  if (shouldPushCloud && typeof CloudSync !== 'undefined' && CloudSync.push) {
     CloudSync.push(state.items);
   }
 }
@@ -325,150 +328,338 @@ function importLibraryJSON(file) {
 }
 
 // ---------------------------------------------------------------------------
-// Cloud Synchronisation Engine (Supabase / Firebase)
+// Cloud Synchronisation Engine (Multi-User Supabase Realtime)
 // ---------------------------------------------------------------------------
 
 /**
- * CloudSync — Cross-device synchronization engine.
+ * CloudSync — Multi-User Cross-Device Synchronization Engine.
  *
- * HOW TO ACTIVATE SUPABASE:
- * 1. Add to index.html <head>:
- *    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- * 2. In OMNICHART_CONFIG above, set:
- *    cloudProvider: 'supabase'
- *    supabase.url = 'https://YOUR_PROJECT.supabase.co'
- *    supabase.anonKey = 'YOUR_ANON_KEY'
- * 3. Create the table in Supabase SQL editor (see README.md for the SQL script).
- *
- * HOW TO ACTIVATE FIREBASE:
- * 1. Set cloudProvider: 'firebase'
- * 2. Fill firebase config object in OMNICHART_CONFIG.
+ * Each user creates their own private account.
+ * Data is isolated per user using PostgreSQL Row-Level Security (RLS).
+ * Realtime updates propagate changes across phones, tablets, and laptops instantly.
  */
 const CloudSync = {
-  _supabaseClient: null,
+  _client: null,
+  _realtimeChannel: null,
+
+  getUrl() {
+    return (OMNICHART_CONFIG.supabase.url || localStorage.getItem('omnichart_supabase_url') || '').trim();
+  },
+
+  getAnonKey() {
+    return (OMNICHART_CONFIG.supabase.anonKey || localStorage.getItem('omnichart_supabase_anon_key') || '').trim();
+  },
+
+  isConfigured() {
+    return Boolean(this.getUrl() && this.getAnonKey());
+  },
+
+  saveCredentials(url, key) {
+    if (url) localStorage.setItem('omnichart_supabase_url', url.trim());
+    if (key) localStorage.setItem('omnichart_supabase_anon_key', key.trim());
+    this._client = null;
+    return this.init();
+  },
 
   getClient() {
-    if (OMNICHART_CONFIG.cloudProvider === 'supabase') {
-      if (!this._supabaseClient && window.supabase && OMNICHART_CONFIG.supabase.url) {
-        this._supabaseClient = window.supabase.createClient(
-          OMNICHART_CONFIG.supabase.url,
-          OMNICHART_CONFIG.supabase.anonKey
-        );
+    if (this._client) return this._client;
+    const url = this.getUrl();
+    const key = this.getAnonKey();
+    if (window.supabase && url && key) {
+      try {
+        this._client = window.supabase.createClient(url, key, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true
+          }
+        });
+      } catch (err) {
+        console.warn('[CloudSync] Failed to initialize Supabase client:', err);
       }
-      return this._supabaseClient;
     }
-    return null;
+    return this._client;
   },
 
-  /** Push library entries to the cloud */
+  /** Initialize connection, check existing session, and listen to auth changes */
+  async init() {
+    const client = this.getClient();
+    if (!client) {
+      state.cloudStatus = 'offline';
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
+      return;
+    }
+
+    try {
+      state.cloudStatus = 'connecting';
+      const { data: { session }, error } = await client.auth.getSession();
+      if (!error && session?.user) {
+        state.user = session.user;
+        state.cloudStatus = 'connected';
+        const remoteItems = await this.pull();
+        if (Array.isArray(remoteItems) && remoteItems.length > 0) {
+          state.items = remoteItems;
+          saveItems(false);
+          if (typeof renderAll === 'function') renderAll();
+        }
+        this.subscribe();
+      } else {
+        state.user = null;
+        state.cloudStatus = 'offline';
+      }
+    } catch (err) {
+      state.cloudStatus = 'offline';
+    }
+
+    if (typeof renderAuthStatus === 'function') renderAuthStatus();
+
+    // Listen to real-time auth events (Sign In, Sign Out, Token Refresh)
+    client.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        state.user = session.user;
+        state.cloudStatus = 'connected';
+        const remoteItems = await this.pull();
+        if (Array.isArray(remoteItems) && remoteItems.length > 0) {
+          state.items = remoteItems;
+          saveItems(false);
+        } else if (state.items.length > 0) {
+          // If remote is empty but user has local items, offer or auto-upload
+          await this.push(state.items);
+        }
+        this.subscribe();
+      } else {
+        state.user = null;
+        state.cloudStatus = 'offline';
+        if (this._realtimeChannel) {
+          client.removeChannel(this._realtimeChannel);
+          this._realtimeChannel = null;
+        }
+      }
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
+      if (typeof renderAll === 'function') renderAll();
+    });
+  },
+
+  /** Sign up a new user account with email and password */
+  async signUp(email, password) {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase credentials not configured yet. Please configure them in Database Setup.');
+    const { data, error } = await client.auth.signUp({
+      email: email.trim(),
+      password: password.trim()
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  /** Sign in an existing user with email and password */
+  async signIn(email, password) {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase credentials not configured yet. Please configure them in Database Setup.');
+    const { data, error } = await client.auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim()
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  /** Sign out current user session */
+  async signOut() {
+    const client = this.getClient();
+    if (!client) return;
+    await client.auth.signOut();
+  },
+
+  /** Push items to user's isolated cloud table (Upsert) */
   async push(items) {
-    const provider = OMNICHART_CONFIG.cloudProvider;
-    if (provider === 'localStorage' || !items) return;
+    if (!state.user || !Array.isArray(items) || items.length === 0) return;
+    const client = this.getClient();
+    if (!client) return;
 
-    if (provider === 'supabase') {
-      const client = this.getClient();
-      if (!client) return;
-      try {
-        const rows = items.map((item) => ({
-          id: item.id,
-          title: item.title,
-          category: item.category,
-          status: item.status,
-          rating: item.rating,
-          progress: item.progress,
-          total_units: item.totalUnits,
-          unit_name: item.unitName,
-          studio: item.studio,
-          release_date: item.releaseDate,
-          consumed_date: item.consumedDate,
-          genres: item.genres,
-          image: item.image,
-          synopsis: item.synopsis,
-          notes: item.notes,
-          updated_at: item.updatedAt || Date.now()
-        }));
+    try {
+      const rows = items.map((item) => ({
+        id: item.id,
+        user_id: state.user.id,
+        title: item.title,
+        category: item.category || 'Series & Anime',
+        status: (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status,
+        rating: Number(item.rating || 0),
+        progress: Number(item.progress || 0),
+        total_units: Number(item.totalUnits || 12),
+        unit_name: item.unitName || 'eps',
+        studio: item.studio || 'Unknown Studio',
+        release_date: item.releaseDate || 'TBA',
+        consumed_date: item.consumedDate || '',
+        genres: Array.isArray(item.genres) ? item.genres : [],
+        image: item.image || '',
+        synopsis: item.synopsis || '',
+        notes: item.notes || '',
+        updated_at: Number(item.updatedAt || Date.now())
+      }));
 
-        const { error } = await client
-          .from(OMNICHART_CONFIG.supabase.tableName)
-          .upsert(rows, { onConflict: 'id' });
+      const { error } = await client
+        .from(OMNICHART_CONFIG.supabase.tableName)
+        .upsert(rows, { onConflict: 'id,user_id' });
 
-        if (error) console.warn('[OmniChart CloudSync] Supabase push error:', error.message);
-        else console.log('[OmniChart CloudSync] Synced to Supabase successfully.');
-      } catch (err) {
-        console.warn('[OmniChart CloudSync] Supabase push exception:', err);
-      }
-    }
-
-    if (provider === 'firebase' && window.firebase) {
-      // Firebase Firestore implementation stub
-      // const db = firebase.firestore();
-      // await db.collection('omnichart').doc('library').set({ items });
+      if (error) console.warn('[CloudSync] Upsert error:', error.message);
+    } catch (err) {
+      console.warn('[CloudSync] Push exception:', err);
     }
   },
 
-  /** Pull library entries from the cloud */
-  async pull() {
-    const provider = OMNICHART_CONFIG.cloudProvider;
-    if (provider === 'localStorage') return null;
-
-    if (provider === 'supabase') {
-      const client = this.getClient();
-      if (!client) return null;
-      try {
-        const { data, error } = await client
-          .from(OMNICHART_CONFIG.supabase.tableName)
-          .select('*')
-          .order('updated_at', { ascending: false });
-
-        if (error) {
-          console.warn('[OmniChart CloudSync] Supabase pull error:', error.message);
-          return null;
-        }
-
-        if (Array.isArray(data)) {
-          return data.map((row) => ({
-            id: row.id,
-            title: row.title,
-            category: row.category,
-            status: row.status,
-            rating: Number(row.rating || 0),
-            progress: Number(row.progress || 0),
-            totalUnits: Number(row.total_units || 12),
-            unitName: row.unit_name || 'eps',
-            studio: row.studio || 'Unknown Studio',
-            releaseDate: row.release_date || 'TBA',
-            consumedDate: row.consumed_date || '',
-            genres: Array.isArray(row.genres) ? row.genres : [],
-            image: row.image || '',
-            synopsis: row.synopsis || '',
-            notes: row.notes || '',
-            updatedAt: Number(row.updated_at || Date.now())
-          }));
-        }
-      } catch (err) {
-        console.warn('[OmniChart CloudSync] Supabase pull exception:', err);
-      }
+  /** Delete a single item from the cloud */
+  async deleteItem(id) {
+    if (!state.user || !id) return;
+    const client = this.getClient();
+    if (!client) return;
+    try {
+      await client
+        .from(OMNICHART_CONFIG.supabase.tableName)
+        .delete()
+        .eq('id', id)
+        .eq('user_id', state.user.id);
+    } catch (err) {
+      console.warn('[CloudSync] Delete exception:', err);
     }
+  },
 
+  /** Pull all items for the authenticated user */
+  async pull() {
+    if (!state.user) return null;
+    const client = this.getClient();
+    if (!client) return null;
+
+    try {
+      const { data, error } = await client
+        .from(OMNICHART_CONFIG.supabase.tableName)
+        .select('*')
+        .eq('user_id', state.user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.warn('[CloudSync] Pull error:', error.message);
+        return null;
+      }
+
+      if (Array.isArray(data)) {
+        return data.map((row) => ({
+          id: row.id,
+          title: row.title,
+          category: row.category,
+          status: (typeof normalizeStatus === 'function') ? normalizeStatus(row.status) : row.status,
+          rating: Number(row.rating || 0),
+          progress: Number(row.progress || 0),
+          totalUnits: Number(row.total_units || 12),
+          unitName: row.unit_name || 'eps',
+          studio: row.studio || 'Unknown Studio',
+          releaseDate: row.release_date || 'TBA',
+          consumedDate: row.consumed_date || '',
+          genres: Array.isArray(row.genres) ? row.genres : [],
+          image: row.image || '',
+          synopsis: row.synopsis || '',
+          notes: row.notes || '',
+          updatedAt: Number(row.updated_at || Date.now())
+        }));
+      }
+    } catch (err) {
+      console.warn('[CloudSync] Pull exception:', err);
+    }
     return null;
   },
 
-  /** Subscribe to real-time changes across devices */
-  subscribe(callback) {
-    if (OMNICHART_CONFIG.cloudProvider === 'supabase') {
-      const client = this.getClient();
-      if (!client) return () => {};
-      const channel = client
-        .channel('omnichart_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: OMNICHART_CONFIG.supabase.tableName }, () => {
-          this.pull().then((items) => {
-            if (items && typeof callback === 'function') callback(items);
-          });
-        })
-        .subscribe();
+  /** Subscribe to realtime postgres changes for the current user */
+  subscribe() {
+    if (!state.user) return;
+    const client = this.getClient();
+    if (!client) return;
 
-      return () => client.removeChannel(channel);
+    if (this._realtimeChannel) {
+      client.removeChannel(this._realtimeChannel);
+      this._realtimeChannel = null;
     }
-    return () => {};
+
+    try {
+      this._realtimeChannel = client
+        .channel(`omnichart_sync_${state.user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: OMNICHART_CONFIG.supabase.tableName,
+            filter: `user_id=eq.${state.user.id}`
+          },
+          async () => {
+            const remoteItems = await this.pull();
+            if (remoteItems) {
+              state.items = remoteItems;
+              saveItems(false);
+              if (typeof renderAll === 'function') renderAll();
+              if (typeof showToast === 'function') showToast('⚡ Synced changes from your other device');
+            }
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('[CloudSync] Realtime subscribe error:', err);
+    }
+  },
+
+  /** SQL schema script to copy-paste into Supabase SQL editor */
+  getSqlSchema() {
+    return `-- ==========================================================================
+-- OmniChart Multi-User Realtime Schema (PostgreSQL + Row-Level Security)
+-- Run this in your Supabase Project -> SQL Editor -> Run
+-- ==========================================================================
+
+-- 1. Create Media Library Table
+CREATE TABLE IF NOT EXISTS public.omnichart_items (
+    id TEXT NOT NULL,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    category TEXT DEFAULT 'Series & Anime',
+    status TEXT DEFAULT 'Completed',
+    rating NUMERIC DEFAULT 0,
+    progress INTEGER DEFAULT 0,
+    total_units INTEGER DEFAULT 12,
+    unit_name TEXT DEFAULT 'eps',
+    studio TEXT DEFAULT 'Unknown Studio',
+    release_date TEXT DEFAULT 'TBA',
+    consumed_date TEXT DEFAULT '',
+    genres TEXT[] DEFAULT '{}',
+    image TEXT DEFAULT '',
+    synopsis TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    updated_at BIGINT DEFAULT (extract(epoch from now()) * 1000),
+    PRIMARY KEY (id, user_id)
+);
+
+-- 2. Enable Row-Level Security (RLS) for complete privacy
+ALTER TABLE public.omnichart_items ENABLE ROW LEVEL SECURITY;
+
+-- 3. Security Policies: Each user can ONLY view, insert, update & delete their own items
+DROP POLICY IF EXISTS "Users can select own items" ON public.omnichart_items;
+CREATE POLICY "Users can select own items"
+    ON public.omnichart_items FOR SELECT
+    USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert own items" ON public.omnichart_items;
+CREATE POLICY "Users can insert own items"
+    ON public.omnichart_items FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update own items" ON public.omnichart_items;
+CREATE POLICY "Users can update own items"
+    ON public.omnichart_items FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete own items" ON public.omnichart_items;
+CREATE POLICY "Users can delete own items"
+    ON public.omnichart_items FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- 4. Enable Supabase Realtime broadcast
+ALTER PUBLICATION supabase_realtime ADD TABLE public.omnichart_items;`;
   }
 };
