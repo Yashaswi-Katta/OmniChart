@@ -701,8 +701,60 @@ const CloudSync = {
       return;
     }
 
+    // Register onAuthStateChange immediately so PASSWORD_RECOVERY is never missed
+    client.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        if (session?.user) state.user = session.user;
+        if (typeof openAuthModal === 'function') {
+          openAuthModal('reset-password');
+        }
+        return;
+      }
+      if (session?.user) {
+        state.user = session.user;
+        state.cloudStatus = 'connected';
+        const remoteItems = await this.pull();
+        if (Array.isArray(remoteItems) && remoteItems.length > 0) {
+          state.items = remoteItems;
+          saveItems(false);
+        } else if (state.items.length > 0) {
+          await this.push(state.items);
+        }
+        this.subscribe();
+      } else {
+        state.user = null;
+        state.cloudStatus = 'offline';
+        if (this._realtimeChannel) {
+          client.removeChannel(this._realtimeChannel);
+          this._realtimeChannel = null;
+        }
+      }
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
+      if (typeof renderAll === 'function') renderAll();
+    });
+
     try {
       state.cloudStatus = 'connecting';
+
+      // Check if arrived with PKCE auth code (?code=...)
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      if (code) {
+        try {
+          const { data } = await client.auth.exchangeCodeForSession(code);
+          if (data?.session) {
+            state.user = data.session.user;
+            const isRecoveryCode = window.location.search.includes('type=recovery') || window.location.hash.includes('type=recovery');
+            if (isRecoveryCode && typeof openAuthModal === 'function') {
+              openAuthModal('reset-password');
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[CloudSync] PKCE exchange error:', e);
+        }
+      }
+
       const { data: { session }, error } = await client.auth.getSession();
       const isRecovery = window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery');
       if (isRecovery) {
@@ -729,39 +781,6 @@ const CloudSync = {
     }
 
     if (typeof renderAuthStatus === 'function') renderAuthStatus();
-
-    // Listen to real-time auth events (Sign In, Sign Out, Token Refresh, Password Recovery)
-    client.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        if (session?.user) state.user = session.user;
-        if (typeof openAuthModal === 'function') {
-          openAuthModal('reset-password');
-        }
-        return;
-      }
-      if (session?.user) {
-        state.user = session.user;
-        state.cloudStatus = 'connected';
-        const remoteItems = await this.pull();
-        if (Array.isArray(remoteItems) && remoteItems.length > 0) {
-          state.items = remoteItems;
-          saveItems(false);
-        } else if (state.items.length > 0) {
-          // If remote is empty but user has local items, offer or auto-upload
-          await this.push(state.items);
-        }
-        this.subscribe();
-      } else {
-        state.user = null;
-        state.cloudStatus = 'offline';
-        if (this._realtimeChannel) {
-          client.removeChannel(this._realtimeChannel);
-          this._realtimeChannel = null;
-        }
-      }
-      if (typeof renderAuthStatus === 'function') renderAuthStatus();
-      if (typeof renderAll === 'function') renderAll();
-    });
   },
 
   /** Sign up a new user account with email and password */
@@ -795,16 +814,118 @@ const CloudSync = {
     await client.auth.signOut();
   },
 
+  /** Calculate safe redirect URL for auth emails (supports GitHub Pages and localhost) */
+  getResetRedirectUrl() {
+    const loc = window.location;
+    if (loc.protocol === 'http:' || loc.protocol === 'https:') {
+      return `${loc.origin}${loc.pathname}`;
+    }
+    return 'https://yashaswi-katta.github.io/OmniChart/';
+  },
+
   /** Send password recovery email */
   async resetPasswordForEmail(email) {
     const client = this.getClient();
     if (!client) throw new Error('Supabase credentials not configured yet. Please configure them in Database Setup.');
-    const redirectTo = window.location.origin + window.location.pathname;
+    const redirectTo = this.getResetRedirectUrl();
     const { data, error } = await client.auth.resetPasswordForEmail(email.trim(), {
       redirectTo
     });
     if (error) throw error;
     return data;
+  },
+
+  /** Parse recovery credentials from URL, hash, query params, or raw token string */
+  parseRecoveryInput(input) {
+    if (!input || typeof input !== 'string') return null;
+    const str = input.trim();
+
+    let hashStr = '';
+    let queryStr = '';
+
+    if (str.includes('#')) {
+      hashStr = str.substring(str.indexOf('#') + 1);
+    }
+    if (str.includes('?')) {
+      const qPart = str.substring(str.indexOf('?') + 1);
+      queryStr = qPart.includes('#') ? qPart.substring(0, qPart.indexOf('#')) : qPart;
+    }
+
+    const hashParams = new URLSearchParams(hashStr);
+    const queryParams = new URLSearchParams(queryStr);
+
+    const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+    const type = hashParams.get('type') || queryParams.get('type');
+    const tokenHash = queryParams.get('token_hash') || hashParams.get('token_hash');
+    const token = queryParams.get('token') || hashParams.get('token');
+    const code = queryParams.get('code') || hashParams.get('code');
+
+    return {
+      accessToken,
+      refreshToken,
+      type,
+      tokenHash,
+      token: token || (!str.includes('/') && !str.includes('?') && !str.includes('#') && !str.includes('&') ? str : null),
+      code
+    };
+  },
+
+  /** Verify pasted recovery URL, token_hash, PKCE code, or raw token */
+  async applyRecoveryUrlOrToken(input, email = '') {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase client not initialized');
+
+    const parsed = this.parseRecoveryInput(input);
+    if (!parsed) throw new Error('Please enter a valid reset link, token, or URL.');
+
+    // 1. Direct access_token + refresh_token from localhost address bar
+    if (parsed.accessToken && parsed.refreshToken) {
+      const { data, error } = await client.auth.setSession({
+        access_token: parsed.accessToken,
+        refresh_token: parsed.refreshToken
+      });
+      if (error) throw error;
+      if (data?.user) state.user = data.user;
+      return data;
+    }
+
+    // 2. PKCE code exchange (?code=...)
+    if (parsed.code) {
+      const { data, error } = await client.auth.exchangeCodeForSession(parsed.code);
+      if (error) throw error;
+      if (data?.user) state.user = data.user;
+      return data;
+    }
+
+    // 3. token_hash verification from email link
+    if (parsed.tokenHash) {
+      const { data, error } = await client.auth.verifyOtp({
+        token_hash: parsed.tokenHash,
+        type: 'recovery'
+      });
+      if (error) throw error;
+      if (data?.user) state.user = data.user;
+      return data;
+    }
+
+    // 4. Token verification with email
+    if (parsed.token) {
+      const targetEmail = (email || '').trim();
+      if (!targetEmail) {
+        throw new Error('Please enter your account email in the box above to verify this token.');
+      }
+      const { data, error } = await client.auth.verifyOtp({
+        email: targetEmail,
+        token: parsed.token,
+        type: 'recovery'
+      });
+      if (error) throw error;
+      if (data?.user) state.user = data.user;
+      return data;
+    }
+
+    throw new Error('Could not find recovery credentials in the provided text. Please paste the full URL or token.');
   },
 
   /** Update user password (used after password recovery) */
