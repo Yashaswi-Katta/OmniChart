@@ -160,12 +160,13 @@
             >
               <span class="flex items-center gap-2"><span>💾</span> Export Backup JSON</span>
             </button>
-            <!-- Import JSON Option in Logo Dropdown (User Request 4) -->
+            <!-- Universal Importer Option (Supports OmniChart JSON, MyAnimeList XML, AniList JSON) -->
             <label
               class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#364146] cursor-pointer transition"
+              title="Import OmniChart backup, MyAnimeList XML export, or AniList export"
             >
-              <span class="flex items-center gap-2"><span>📂</span> Import JSON File</span>
-              <input id="importFileInput" type="file" accept=".json,application/json" class="hidden" />
+              <span class="flex items-center gap-2"><span>📂</span> Import Backup / MAL / AniList</span>
+              <input id="importFileInput" type="file" accept=".json,.xml,application/json,text/xml,application/xml" class="hidden" />
             </label>
             <div class="border-t border-[#3d494f]/70 my-1"></div>
             <button

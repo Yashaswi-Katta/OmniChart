@@ -649,8 +649,8 @@ function renderLibrary() {
             <span>+</span> Add your first title
           </button>
           <label class="px-4 py-2.5 rounded-xl bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 text-xs font-semibold cursor-pointer transition flex items-center gap-2">
-            <span>📂</span> Import JSON backup
-            <input id="onboardingImportInput" type="file" accept=".json,application/json" class="hidden" />
+            <span>📂</span> Import Library / MAL / AniList
+            <input id="onboardingImportInput" type="file" accept=".json,.xml,application/json,text/xml,application/xml" class="hidden" />
           </label>
         </div>
       </div>

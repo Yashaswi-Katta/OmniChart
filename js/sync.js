@@ -541,6 +541,186 @@ function exportLibraryJSON() {
 // JSON import
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Universal Library Importer (OmniChart JSON, MAL XML, AniList JSON) - Feature 5
+// ---------------------------------------------------------------------------
+
+function parseMalXml(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+  const animeNodes = Array.from(doc.querySelectorAll('anime'));
+  const items = [];
+
+  const malStatusMap = {
+    '1': 'Ongoing',
+    '2': 'Completed',
+    '3': 'On Hold',
+    '4': 'Dropped',
+    '6': 'Planning',
+    'watching': 'Ongoing',
+    'completed': 'Completed',
+    'on-hold': 'On Hold',
+    'dropped': 'Dropped',
+    'plan to watch': 'Planning'
+  };
+
+  function reformatMalDate(dStr) {
+    if (!dStr || dStr.startsWith('0000')) return '';
+    const p = dStr.split('-');
+    if (p.length === 3) {
+      const y = parseInt(p[0], 10);
+      const m = parseInt(p[1], 10);
+      const d = parseInt(p[2], 10);
+      if (y && m && d) return `${d}-${m}-${y}`;
+      if (y && m) return `1-${m}-${y}`;
+      if (y) return `1-1-${y}`;
+    }
+    return '';
+  }
+
+  for (const node of animeNodes) {
+    const title = node.querySelector('series_title')?.textContent?.trim();
+    if (!title) continue;
+    const malId = node.querySelector('series_animedb_id')?.textContent?.trim() || Math.random().toString(36).slice(2, 8);
+    const id = 'mal-' + malId;
+    const type = (node.querySelector('series_type')?.textContent?.trim() || 'TV').toLowerCase();
+    const isMovie = type.includes('movie');
+    const category = isMovie ? 'Movies' : 'Series & Anime';
+    const episodes = parseInt(node.querySelector('series_episodes')?.textContent, 10) || (isMovie ? 1 : 12);
+    const watched = parseInt(node.querySelector('my_watched_episodes')?.textContent, 10) || 0;
+    const rawScore = parseFloat(node.querySelector('my_score')?.textContent) || 0;
+    const rawStatus = (node.querySelector('my_status')?.textContent || '').trim().toLowerCase();
+    const status = malStatusMap[rawStatus] || 'Completed';
+
+    const startDate = node.querySelector('my_start_date')?.textContent?.trim();
+    const finishDate = node.querySelector('my_finish_date')?.textContent?.trim();
+    let consumedDate = '';
+    const sFmt = reformatMalDate(startDate);
+    const fFmt = reformatMalDate(finishDate);
+    if (sFmt && fFmt && sFmt !== fFmt) {
+      consumedDate = `${sFmt} to ${fFmt}`;
+    } else if (fFmt) {
+      consumedDate = fFmt;
+    } else if (sFmt) {
+      consumedDate = sFmt;
+    }
+
+    const tagsRaw = node.querySelector('my_tags')?.textContent?.trim() || '';
+    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean) : [];
+    const notes = node.querySelector('my_comments')?.textContent?.trim() || '';
+
+    items.push({
+      id,
+      title,
+      category,
+      status,
+      rating: rawScore,
+      progress: status === 'Completed' ? Math.max(watched, episodes) : watched,
+      totalUnits: episodes,
+      unitName: isMovie ? 'movie' : 'eps',
+      studio: 'Unknown Studio',
+      releaseDate: 'TBA',
+      consumedDate,
+      genres: [],
+      favorite: tags.some(t => t.toLowerCase() === 'favorite' || t.toLowerCase() === 'fav'),
+      tags,
+      image: '',
+      synopsis: '',
+      notes,
+      updatedAt: Date.now()
+    });
+  }
+  return items;
+}
+
+function parseAniListJson(data) {
+  const rawList = [];
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (item.media || item.mediaId) rawList.push(item);
+    }
+  } else if (data?.data?.MediaListCollection?.lists) {
+    for (const list of data.data.MediaListCollection.lists) {
+      if (Array.isArray(list.entries)) rawList.push(...list.entries);
+    }
+  } else if (Array.isArray(data?.lists)) {
+    for (const list of data.lists) {
+      if (Array.isArray(list.entries)) rawList.push(...list.entries);
+    }
+  }
+
+  const anilistStatusMap = {
+    'CURRENT': 'Ongoing',
+    'COMPLETED': 'Completed',
+    'PAUSED': 'On Hold',
+    'DROPPED': 'Dropped',
+    'PLANNING': 'Planning',
+    'REPEATING': 'Ongoing'
+  };
+
+  function fmtAniDate(obj) {
+    if (obj && obj.year && obj.month && obj.day) {
+      return `${obj.day}-${obj.month}-${obj.year}`;
+    }
+    return '';
+  }
+
+  return rawList.map(entry => {
+    const m = entry.media || {};
+    const titleEng = m.title?.english || '';
+    const titleRom = m.title?.romaji || '';
+    const title = titleEng || titleRom || m.title?.userPreferred || 'Untitled Media';
+    const id = 'al-' + (m.id || entry.mediaId || Math.random().toString(36).slice(2, 8));
+    const isMovie = m.format === 'MOVIE';
+    const category = isMovie ? 'Movies' : 'Series & Anime';
+    const status = anilistStatusMap[entry.status] || 'Completed';
+
+    let rating = Number(entry.score || 0);
+    if (rating > 10) rating = Number((rating / 10).toFixed(1));
+
+    const totalUnits = Math.max(1, Number(m.episodes || (isMovie ? 1 : 12)));
+    const progress = status === 'Completed' ? totalUnits : Number(entry.progress || 0);
+
+    let consumedDate = '';
+    const sStr = fmtAniDate(entry.startedAt);
+    const cStr = fmtAniDate(entry.completedAt);
+    if (sStr && cStr && sStr !== cStr) consumedDate = `${sStr} to ${cStr}`;
+    else if (cStr) consumedDate = cStr;
+    else if (sStr) consumedDate = sStr;
+
+    const studioNodes = m.studios?.nodes || [];
+    const animStudios = studioNodes.filter(n => n.isAnimationStudio).map(n => n.name);
+    const allStudios = studioNodes.map(n => n.name);
+    const studio = (animStudios.length ? animStudios : allStudios).slice(0, 2).join(', ') || 'Unknown Studio';
+
+    const image = m.coverImage?.extraLarge || m.coverImage?.large || '';
+    const synopsis = typeof cleanHtmlSynopsis === 'function' ? cleanHtmlSynopsis(m.description) : (m.description || '');
+
+    return {
+      id,
+      title,
+      titleEnglish: titleEng,
+      titleRomaji: titleRom,
+      category,
+      status,
+      rating,
+      progress,
+      totalUnits,
+      unitName: isMovie ? 'movie' : 'eps',
+      studio,
+      releaseDate: (typeof formatSeasonYear === 'function') ? formatSeasonYear(m.season, m.seasonYear, m.startDate?.year) : (m.seasonYear ? String(m.seasonYear) : 'TBA'),
+      consumedDate,
+      genres: Array.isArray(m.genres) ? m.genres.slice(0, 4) : [],
+      favorite: false,
+      tags: Array.isArray(entry.customLists) ? entry.customLists.filter(Boolean) : [],
+      image,
+      synopsis,
+      notes: entry.notes || '',
+      updatedAt: entry.updatedAt ? entry.updatedAt * 1000 : Date.now()
+    };
+  });
+}
+
 function importLibraryJSON(file) {
   if (!OwnerMode.isOwner()) {
     if (typeof showToast === 'function') showToast('Read-Only mode: Enter owner passcode to import');
@@ -550,12 +730,48 @@ function importLibraryJSON(file) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      const imported = JSON.parse(reader.result);
-      if (!Array.isArray(imported)) throw new Error('Invalid JSON');
+      const rawText = (reader.result || '').trim();
+      let imported = [];
+      let formatSource = 'OmniChart Backup';
+
+      // 1. Detect MyAnimeList XML
+      if (rawText.startsWith('<?xml') || rawText.includes('<myanimelist>') || rawText.includes('<anime>')) {
+        imported = parseMalXml(rawText);
+        formatSource = 'MyAnimeList';
+      } else {
+        // 2. Parse JSON
+        const parsed = JSON.parse(rawText);
+
+        // Check AniList format
+        if (parsed?.data?.MediaListCollection || (Array.isArray(parsed) && parsed.some(x => x && (x.media || x.mediaId)))) {
+          imported = parseAniListJson(parsed);
+          formatSource = 'AniList';
+        } else if (Array.isArray(parsed)) {
+          imported = parsed;
+          formatSource = 'OmniChart Backup';
+        } else if (Array.isArray(parsed?.items)) {
+          imported = parsed.items;
+          formatSource = 'OmniChart Backup';
+        } else {
+          throw new Error('Unrecognized JSON format');
+        }
+      }
+
+      if (!Array.isArray(imported) || imported.length === 0) {
+        throw new Error('No valid entries found to import');
+      }
+
       const byId = new Map(state.items.map((i) => [i.id, i]));
+      const titleLookup = new Map(state.items.map((i) => [(i.title || '').toLowerCase().trim(), i]));
+
       for (const raw of imported) {
         if (!raw || !raw.title) continue;
-        const id = raw.id || ('imp-' + Math.random().toString(36).slice(2, 9));
+
+        // Title deduplication check
+        const cleanTitle = (raw.title || '').toLowerCase().trim();
+        const existingByTitle = titleLookup.get(cleanTitle);
+
+        const id = raw.id || existingByTitle?.id || ('imp-' + Math.random().toString(36).slice(2, 9));
         const rec = LIVECHART_ID_TITLE_RECOVERY[id];
         const recTitle = (typeof rec === 'object' && rec.title) ? rec.title : rec;
         const recEng   = (typeof rec === 'object' && rec.english) ? rec.english : '';
@@ -564,41 +780,46 @@ function importLibraryJSON(file) {
         const recoveredTitle = isBrokenTitle(raw.title) && recTitle
           ? recTitle
           : raw.title;
+
         byId.set(id, {
           id,
           title:        recoveredTitle,
-          titleEnglish: raw.titleEnglish || recEng || '',
-          titleRomaji:  raw.titleRomaji  || recRom || '',
-          category:     raw.category || 'Series & Anime',
-          status:       normalizeStatus(raw.status),
-          rating:       Number(raw.rating || 0),
-          progress:     Number(raw.progress ?? raw.totalUnits ?? 1),
-          totalUnits:   Math.max(1, Number(raw.totalUnits || 12)),
-          unitName:     raw.unitName || 'eps',
-          studio:       raw.studio || 'Unknown Studio',
-          releaseDate:  raw.releaseDate || 'TBA',
-          consumedDate: raw.consumedDate || '',
-          genres:       Array.isArray(raw.genres) ? raw.genres : [],
-          favorite:     Boolean(raw.favorite),
-          tags:         Array.isArray(raw.tags) ? raw.tags : [],
-          image:        raw.image || '',
-          synopsis:     raw.synopsis || '',
-          notes:        raw.notes || '',
+          titleEnglish: raw.titleEnglish || existingByTitle?.titleEnglish || recEng || '',
+          titleRomaji:  raw.titleRomaji  || existingByTitle?.titleRomaji  || recRom || '',
+          category:     raw.category || existingByTitle?.category || 'Series & Anime',
+          status:       normalizeStatus(raw.status || existingByTitle?.status),
+          rating:       Number(raw.rating ?? existingByTitle?.rating ?? 0),
+          progress:     Number(raw.progress ?? existingByTitle?.progress ?? raw.totalUnits ?? 1),
+          totalUnits:   Math.max(1, Number(raw.totalUnits || existingByTitle?.totalUnits || 12)),
+          unitName:     raw.unitName || existingByTitle?.unitName || 'eps',
+          studio:       raw.studio && raw.studio !== 'Unknown Studio' ? raw.studio : (existingByTitle?.studio || 'Unknown Studio'),
+          releaseDate:  raw.releaseDate && raw.releaseDate !== 'TBA' ? raw.releaseDate : (existingByTitle?.releaseDate || 'TBA'),
+          consumedDate: raw.consumedDate || existingByTitle?.consumedDate || '',
+          genres:       Array.isArray(raw.genres) && raw.genres.length > 0 ? raw.genres : (existingByTitle?.genres || []),
+          favorite:     Boolean(raw.favorite ?? existingByTitle?.favorite),
+          tags:         Array.isArray(raw.tags) ? raw.tags : (existingByTitle?.tags || []),
+          image:        raw.image || existingByTitle?.image || '',
+          synopsis:     raw.synopsis || existingByTitle?.synopsis || '',
+          notes:        raw.notes || existingByTitle?.notes || '',
           updatedAt:    raw.updatedAt || Date.now()
         });
       }
+
       state.items = Array.from(byId.values());
       saveItems();
       if (typeof renderAll === 'function') renderAll();
       if (typeof showToast === 'function') {
-        showToast(`Imported ${imported.length} entries — starting metadata enrichment...`);
+        showToast(`Imported ${imported.length} titles from ${formatSource}! Starting metadata enricher...`);
       }
-      // Automatically enrich missing Studio, Synopsis, Release Date & Genres!
+      // Automatically enrich missing Studio, Synopsis, Release Date & Genres
       if (typeof enrichMissingMetadata === 'function') {
         enrichMissingMetadata(false);
       }
     } catch (err) {
-      if (typeof showToast === 'function') showToast('Failed to parse JSON file');
+      console.warn('[Importer Error]', err);
+      if (typeof showToast === 'function') {
+        showToast('Failed to import file. Make sure it is OmniChart JSON, MAL XML, or AniList JSON.');
+      }
     }
   };
   reader.readAsText(file);
