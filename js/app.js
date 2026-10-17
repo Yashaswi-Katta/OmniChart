@@ -2099,6 +2099,38 @@ function openConfirmModal(options, msgLegacy, onConfirmLegacy) {
   if (modal) modal.classList.remove('hidden');
 }
 
+function triggerTitleLangToggle() {
+  state.titleLang = state.titleLang === 'romaji' ? 'english' : 'romaji';
+  try { localStorage.setItem('omnichart_title_lang', state.titleLang); } catch (e) {}
+
+  // Self-healing pass: resolve any items missing English or Romaji titles
+  let healed = false;
+  if (typeof lookupBilingualTitle === 'function') {
+    for (const item of state.items) {
+      if (!item.titleEnglish || !item.titleRomaji) {
+        const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
+        if (match) {
+          if (!item.titleEnglish && match.english) { item.titleEnglish = match.english; healed = true; }
+          if (!item.titleRomaji && match.romaji) { item.titleRomaji = match.romaji; healed = true; }
+        }
+      }
+    }
+  }
+  if (healed && typeof saveItems === 'function') {
+    saveItems();
+  }
+
+  // If any items are still missing English or Romaji titles, kick off background enrichment
+  const missingLangCount = state.items.filter((i) => !i.titleEnglish || !i.titleRomaji).length;
+  if (missingLangCount > 0 && typeof enrichMissingMetadata === 'function' && !state.enrichRunning) {
+    enrichMissingMetadata(false);
+  }
+
+  renderNavigation();
+  renderAll();
+  showToast(`Display titles: ${state.titleLang === 'romaji' ? 'Romaji' : 'English'}`);
+}
+
 // ---------------------------------------------------------------------------
 // Central Event Delegation
 // ---------------------------------------------------------------------------
@@ -2190,35 +2222,12 @@ document.addEventListener('click', async (e) => {
       }
     }
   } else if (action === 'toggle-title-lang') {
-    state.titleLang = state.titleLang === 'romaji' ? 'english' : 'romaji';
-    try { localStorage.setItem('omnichart_title_lang', state.titleLang); } catch (e) {}
-
-    // Self-healing pass: resolve any items missing English or Romaji titles
-    let healed = false;
-    if (typeof lookupBilingualTitle === 'function') {
-      for (const item of state.items) {
-        if (!item.titleEnglish || !item.titleRomaji) {
-          const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
-          if (match) {
-            if (!item.titleEnglish && match.english) { item.titleEnglish = match.english; healed = true; }
-            if (!item.titleRomaji && match.romaji) { item.titleRomaji = match.romaji; healed = true; }
-          }
-        }
-      }
-    }
-    if (healed && typeof saveItems === 'function') {
-      saveItems();
-    }
-
-    // If any items are still missing English or Romaji titles, kick off background enrichment
-    const missingLangCount = state.items.filter((i) => !i.titleEnglish || !i.titleRomaji).length;
-    if (missingLangCount > 0 && typeof enrichMissingMetadata === 'function' && !state.enrichRunning) {
-      enrichMissingMetadata(false);
-    }
-
-    renderNavigation();
-    renderAll();
-    showToast(`Display titles: ${state.titleLang === 'romaji' ? 'Romaji' : 'English'}`);
+    triggerTitleLangToggle();
+  } else if (action === 'open-shortcuts-modal') {
+    if (dropdown) dropdown.classList.add('hidden');
+    document.getElementById('shortcutsModal')?.classList.remove('hidden');
+  } else if (action === 'close-shortcuts-modal') {
+    document.getElementById('shortcutsModal')?.classList.add('hidden');
   } else if (action === 'set-density') {
     const dens = btn.dataset.density;
     if (dens && (dens === 'grid' || dens === 'list')) {
@@ -3236,8 +3245,37 @@ if (authModalBackdrop) {
   });
 }
 
+const shortcutsModalBackdrop = document.getElementById('shortcutsModal');
+if (shortcutsModalBackdrop) {
+  shortcutsModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === shortcutsModalBackdrop) {
+      shortcutsModalBackdrop.classList.add('hidden');
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard Shortcuts Navigation & Actions
+// ---------------------------------------------------------------------------
 document.addEventListener('keydown', (e) => {
+  const activeEl = document.activeElement;
+  const tag = activeEl ? activeEl.tagName.toLowerCase() : '';
+  const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select' || (activeEl && activeEl.isContentEditable);
+
   if (e.key === 'Escape') {
+    const shortcutsModal = document.getElementById('shortcutsModal');
+    if (shortcutsModal && !shortcutsModal.classList.contains('hidden')) {
+      shortcutsModal.classList.add('hidden');
+      return;
+    }
+    const tomeMenu = document.getElementById('tomeDropdown');
+    if (tomeMenu && !tomeMenu.classList.contains('hidden')) {
+      tomeMenu.classList.add('hidden');
+    }
+    const moreActions = document.getElementById('moreActionsMenu');
+    if (moreActions && !moreActions.classList.contains('hidden')) {
+      moreActions.classList.add('hidden');
+    }
     const authModal = document.getElementById('authModal');
     if (authModal && !authModal.classList.contains('hidden')) {
       authModal.classList.add('hidden');
@@ -3250,6 +3288,56 @@ document.addEventListener('keydown', (e) => {
     if (confirmModal && !confirmModal.classList.contains('hidden')) {
       confirmModal.classList.add('hidden');
       state.pendingConfirmFn = null;
+    }
+    if (activeEl && typeof activeEl.blur === 'function') {
+      activeEl.blur();
+    }
+    return;
+  }
+
+  // Do not trigger single-key actions if the user is typing in a form or field
+  if (isTyping) return;
+
+  // Don't trigger if Ctrl / Cmd / Alt is held
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  if (e.key === '/') {
+    e.preventDefault();
+    if (state.view === 'genre') {
+      const gInp = document.getElementById('genreSearchInput');
+      if (gInp) { gInp.focus(); gInp.select(); }
+    } else {
+      const lInp = document.getElementById('librarySearchInput');
+      if (lInp) { lInp.focus(); lInp.select(); }
+    }
+  } else if (e.key === 'n' || e.key === 'N' || e.key === '+') {
+    e.preventDefault();
+    openMediaModal(null);
+  } else if (e.key === '1') {
+    state.view = 'library';
+    document.getElementById('tomeDropdown')?.classList.add('hidden');
+    renderAll();
+  } else if (e.key === '2') {
+    state.view = 'calendar';
+    document.getElementById('tomeDropdown')?.classList.add('hidden');
+    renderAll();
+  } else if (e.key === '3') {
+    state.view = 'genre';
+    document.getElementById('tomeDropdown')?.classList.add('hidden');
+    renderAll();
+  } else if (e.key === 'l' || e.key === 'L') {
+    triggerTitleLangToggle();
+  } else if (e.key === 'd' || e.key === 'D') {
+    state.viewDensity = state.viewDensity === 'list' ? 'grid' : 'list';
+    try { localStorage.setItem('omnichart_density', state.viewDensity); } catch (err) {}
+    renderNavigation();
+    renderLibrary();
+    showToast(`Density: ${state.viewDensity === 'list' ? 'Compact List' : 'Grid'}`);
+  } else if (e.key === '?') {
+    e.preventDefault();
+    const shortcutsModal = document.getElementById('shortcutsModal');
+    if (shortcutsModal) {
+      shortcutsModal.classList.toggle('hidden');
     }
   }
 });

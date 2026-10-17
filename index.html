@@ -158,6 +158,15 @@
               <span class="flex items-center gap-2"><span>📂</span> Import JSON File</span>
               <input id="importFileInput" type="file" accept=".json,application/json" class="hidden" />
             </label>
+            <div class="border-t border-[#3d494f]/70 my-1"></div>
+            <button
+              data-action="open-shortcuts-modal"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#364146] transition"
+              title="View keyboard shortcuts"
+            >
+              <span class="flex items-center gap-2"><span>⌨️</span> Keyboard Shortcuts</span>
+              <kbd class="text-[10px] px-1.5 py-0.2 rounded bg-[#0d0e11] text-amber-400 font-mono">?</kbd>
+            </button>
           </div>
         </div>
       </div>
@@ -866,6 +875,79 @@
         <button id="confirmModalActionBtn" data-action="confirm-modal-proceed" class="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow transition">
           Confirm
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEYBOARD SHORTCUTS MODAL -->
+  <div
+    id="shortcutsModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="shortcutsModalTitle"
+    class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+  >
+    <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl w-full max-w-md shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-[#3d494f] pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">⌨️</span>
+          <h3 id="shortcutsModalTitle" class="font-bold text-base text-white">Keyboard Shortcuts</h3>
+        </div>
+        <button data-action="close-shortcuts-modal" class="text-slate-400 hover:text-white text-base">✕</button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div>
+          <div class="text-[10px] uppercase font-bold text-slate-400 mb-2 tracking-wider">Navigation</div>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Switch to Library View</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">1</kbd>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Switch to Calendar View</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">2</kbd>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Switch to Genres View</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">3</kbd>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-[10px] uppercase font-bold text-slate-400 mb-2 tracking-wider">Actions &amp; Views</div>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Focus Search</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">/</kbd>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Add New Title</span>
+              <div class="flex items-center gap-1">
+                <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">N</kbd>
+                <span class="text-slate-500">or</span>
+                <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">+</kbd>
+              </div>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Toggle English / Romaji Titles</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">L</kbd>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Toggle Density (Grid / List)</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">D</kbd>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Close Modals / Menus</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-slate-300 font-mono font-bold text-[11px]">Esc</kbd>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Show This Shortcuts Guide</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">?</kbd>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
