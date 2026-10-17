@@ -2468,6 +2468,15 @@ function openMediaModal(item = null, presetDate = '') {
     currentModalGenres = [];
   }
 
+  const shareBtn = document.getElementById('modalShareCardBtn');
+  if (shareBtn) {
+    if (item && item.id) {
+      shareBtn.classList.remove('hidden');
+    } else {
+      shareBtn.classList.add('hidden');
+    }
+  }
+
   // Check duplicate title badge (F11)
   const curId = item ? item.id : '';
   checkDuplicateTitle(document.getElementById('fieldTitle').value, curId);
@@ -2623,6 +2632,409 @@ function saveMediaFromModal() {
   document.getElementById('mediaModal').classList.add('hidden');
   renderAll();
   showToast('Saved entry');
+}
+
+// ---------------------------------------------------------------------------
+// Shareable Card Generator Engine (Feature 6)
+// ---------------------------------------------------------------------------
+
+function openShareModal(itemId = null) {
+  const modal = document.getElementById('shareModal');
+  if (!modal) return;
+
+  const select = document.getElementById('shareItemSelect');
+  if (select) {
+    const sorted = [...state.items].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    select.innerHTML = sorted.map(item => `
+      <option value="${esc(item.id)}">${esc(item.title)} (${item.rating > 0 ? item.rating + '★' : 'Unrated'})</option>
+    `).join('');
+  }
+
+  if (itemId) {
+    state.shareMode = 'single';
+    state.shareSelectedItemId = itemId;
+    if (select) select.value = itemId;
+  } else {
+    state.shareMode = state.shareMode || 'top9';
+    if (!state.shareSelectedItemId && state.items.length > 0) {
+      state.shareSelectedItemId = state.items[0].id;
+    }
+  }
+
+  updateShareModalModeButtons();
+  modal.classList.remove('hidden');
+  renderShareCard();
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal')?.classList.add('hidden');
+}
+
+function updateShareModalModeButtons() {
+  const top9Btn = document.getElementById('shareModeTop9Btn');
+  const singleBtn = document.getElementById('shareModeSingleBtn');
+  const selectBox = document.getElementById('shareSingleItemSelectContainer');
+
+  const activeCls = 'flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-[#ff9f1c] text-[#0d0e11] shadow-sm';
+  const inactiveCls = 'flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition';
+
+  if (state.shareMode === 'single') {
+    if (singleBtn) singleBtn.className = activeCls;
+    if (top9Btn) top9Btn.className = inactiveCls;
+    if (selectBox) selectBox.classList.remove('hidden');
+  } else {
+    if (top9Btn) top9Btn.className = activeCls;
+    if (singleBtn) singleBtn.className = inactiveCls;
+    if (selectBox) selectBox.classList.add('hidden');
+  }
+}
+
+function loadImageSafe(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    setTimeout(() => resolve(null), 2500);
+    img.src = url;
+  });
+}
+
+async function renderShareCard() {
+  const canvas = document.getElementById('shareCanvas');
+  const preview = document.getElementById('sharePreviewImg');
+  const spinner = document.getElementById('shareLoadingIndicator');
+  if (!canvas || !preview) return;
+
+  if (spinner) spinner.classList.remove('hidden');
+  preview.classList.add('opacity-30');
+
+  const ctx = canvas.getContext('2d');
+
+  if (state.shareMode === 'single') {
+    // Single Review Card (1080 x 600)
+    canvas.width = 1080;
+    canvas.height = 600;
+
+    // Dark Gunmetal Base Background
+    ctx.fillStyle = '#0d0e11';
+    ctx.fillRect(0, 0, 1080, 600);
+
+    // Inner Card (#2c3539 with border)
+    ctx.fillStyle = '#2c3539';
+    roundRect(ctx, 30, 30, 1020, 540, 24);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#3d494f';
+    ctx.stroke();
+
+    const curItem = state.items.find(i => i.id === state.shareSelectedItemId) || state.items[0];
+    if (!curItem) {
+      if (spinner) spinner.classList.add('hidden');
+      preview.classList.remove('opacity-30');
+      return;
+    }
+
+    // Left Poster (340 x 480)
+    const posterX = 60;
+    const posterY = 60;
+    const posterW = 340;
+    const posterH = 480;
+
+    ctx.save();
+    roundRect(ctx, posterX, posterY, posterW, posterH, 16);
+    ctx.clip();
+    ctx.fillStyle = '#0d0e11';
+    ctx.fillRect(posterX, posterY, posterW, posterH);
+
+    const posterImg = await loadImageSafe(curItem.image);
+    if (posterImg) {
+      ctx.drawImage(posterImg, posterX, posterY, posterW, posterH);
+    } else {
+      ctx.fillStyle = '#1e2428';
+      ctx.fillRect(posterX, posterY, posterW, posterH);
+      ctx.fillStyle = '#ff9f1c';
+      ctx.font = 'bold 48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✦', posterX + posterW / 2, posterY + posterH / 2 - 20);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 20px sans-serif';
+      wrapText(ctx, curItem.title, posterX + posterW / 2, posterY + posterH / 2 + 30, posterW - 40, 28);
+    }
+    ctx.restore();
+
+    // Right Content Area (starts at x = 440)
+    const contentX = 440;
+    let currY = 85;
+
+    // Rating Badge
+    const rating = Number(curItem.rating || 0);
+    const isMasterpiece = rating >= 9;
+    ctx.fillStyle = isMasterpiece ? '#ff9f1c' : '#0d0e11';
+    roundRect(ctx, contentX, currY, 140, 36, 10);
+    ctx.fill();
+    if (!isMasterpiece) {
+      ctx.strokeStyle = '#ff9f1c';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    ctx.fillStyle = isMasterpiece ? '#0d0e11' : '#ff9f1c';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`★  ${rating > 0 ? rating.toFixed(1) : 'Unrated'}`, contentX + 16, currY + 25);
+
+    // Status Pill
+    const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(curItem.status) : curItem.status;
+    ctx.fillStyle = '#0d0e11';
+    roundRect(ctx, contentX + 155, currY, 110, 36, 10);
+    ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(displayStatus, contentX + 172, currY + 24);
+
+    currY += 75;
+
+    // Title
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'left';
+    const titleLines = wrapText(ctx, curItem.title, contentX, currY, 560, 38, 2);
+    currY += (titleLines.length * 38) + 10;
+
+    // Meta: Category • Studio • Release Date
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '15px sans-serif';
+    const metaStr = `${curItem.category} • ${curItem.studio || 'Studio'} • ${curItem.releaseDate || 'TBA'}`;
+    ctx.fillText(metaStr, contentX, currY);
+    currY += 28;
+
+    // Review / Notes Box
+    const reviewText = (curItem.notes && curItem.notes.trim()) || (curItem.synopsis && curItem.synopsis.trim()) || 'No review notes provided.';
+    ctx.fillStyle = '#0d0e11';
+    roundRect(ctx, contentX, currY, 570, 160, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#3d494f';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ff9f1c';
+    ctx.font = 'bold 36px serif';
+    ctx.fillText('“', contentX + 16, currY + 36);
+
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'italic 15px sans-serif';
+    wrapText(ctx, reviewText, contentX + 45, currY + 34, 500, 24, 4);
+
+    // Footer Watermark inside card
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('OmniChart • Personal Media Tracking', contentX, 545);
+
+  } else {
+    // 3x3 Poster Grid Collage (1080 x 1080)
+    canvas.width = 1080;
+    canvas.height = 1080;
+
+    // Background
+    ctx.fillStyle = '#0d0e11';
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // Header (Top 95px)
+    ctx.fillStyle = '#ff9f1c';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('✦ OmniChart', 45, 52);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('TOP 9 FAVORITES & MASTERPIECES', 45, 78);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ff9f1c';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(`${state.items.length} TITLES TRACKED`, 1035, 62);
+
+    // Filter and sort items: Prioritize favorites, then highest rated
+    const candidates = [...state.items].sort((a, b) => {
+      if (b.favorite && !a.favorite) return 1;
+      if (a.favorite && !b.favorite) return -1;
+      return (Number(b.rating) || 0) - (Number(a.rating) || 0);
+    }).slice(0, 9);
+
+    // 3x3 Grid
+    const startX = 45;
+    const startY = 100;
+    const cellW = 316;
+    const cellH = 290;
+    const gap = 20;
+
+    const loadedImages = await Promise.all(candidates.map(item => loadImageSafe(item.image)));
+
+    for (let i = 0; i < 9; i++) {
+      const col = i % 3;
+      const row = Math.floor(i / 3);
+      const x = startX + col * (cellW + gap);
+      const y = startY + row * (cellH + gap);
+      const item = candidates[i];
+      const img = loadedImages[i];
+
+      ctx.save();
+      roundRect(ctx, x, y, cellW, cellH, 14);
+      ctx.clip();
+
+      if (item) {
+        if (img) {
+          ctx.drawImage(img, x, y, cellW, cellH);
+        } else {
+          ctx.fillStyle = '#2c3539';
+          ctx.fillRect(x, y, cellW, cellH);
+          ctx.fillStyle = '#ff9f1c';
+          ctx.font = 'bold 36px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('✦', x + cellW / 2, y + cellH / 2 - 10);
+        }
+
+        // Bottom gradient overlay for title legibility
+        const grad = ctx.createLinearGradient(x, y + cellH - 90, x, y + cellH);
+        grad.addColorStop(0, 'rgba(13, 14, 17, 0)');
+        grad.addColorStop(1, 'rgba(13, 14, 17, 0.95)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y + cellH - 90, cellW, 90);
+
+        // Rating Star Badge at top-left
+        const r = Number(item.rating || 0);
+        ctx.fillStyle = r >= 9 ? '#ff9f1c' : 'rgba(13, 14, 17, 0.85)';
+        roundRect(ctx, x + 10, y + 10, 68, 26, 6);
+        ctx.fill();
+        ctx.fillStyle = r >= 9 ? '#0d0e11' : '#ff9f1c';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`★ ${r > 0 ? r.toFixed(1) : '-' }`, x + 44, y + 27);
+
+        // Title at bottom
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'left';
+        const displayTitle = item.titleEnglish || item.title;
+        ctx.fillText(displayTitle.slice(0, 32), x + 14, y + cellH - 22);
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(item.studio || item.category, x + 14, y + cellH - 8);
+      } else {
+        // Empty placeholder cell
+        ctx.fillStyle = '#1e2428';
+        ctx.fillRect(x, y, cellW, cellH);
+        ctx.fillStyle = '#3d494f';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('+', x + cellW / 2, y + cellH / 2);
+      }
+      ctx.restore();
+
+      // Border outline
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#3d494f';
+      roundRect(ctx, x, y, cellW, cellH, 14);
+      ctx.stroke();
+    }
+
+    // Footer Watermark (Bottom 35px)
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Generated with OmniChart • Universal Media Tracking', 540, 1055);
+  }
+
+  // Update preview image
+  try {
+    preview.src = canvas.toDataURL('image/png');
+  } catch (err) {
+    console.warn('[Canvas Export CORS Fallback]', err);
+  }
+
+  if (spinner) spinner.classList.add('hidden');
+  preview.classList.remove('opacity-30');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 10) {
+  if (!text) return [];
+  const words = text.split(' ');
+  let line = '';
+  const lines = [];
+
+  for (let n = 0; n < words.length; n++) {
+    const testLine = line + words[n] + ' ';
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && n > 0) {
+      lines.push(line.trim());
+      line = words[n] + ' ';
+      if (lines.length >= maxLines) break;
+    } else {
+      line = testLine;
+    }
+  }
+  if (lines.length < maxLines && line) lines.push(line.trim());
+
+  lines.forEach((l, idx) => {
+    ctx.fillText(l, x, y + (idx * lineHeight));
+  });
+  return lines;
+}
+
+function downloadShareCard() {
+  const canvas = document.getElementById('shareCanvas');
+  if (!canvas) return;
+  try {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    const name = state.shareMode === 'single'
+      ? `omnichart-${(state.shareSelectedItemId || 'card').replace(/\W+/g, '-').toLowerCase()}.png`
+      : 'omnichart-top9.png';
+    a.download = name;
+    a.click();
+    showToast('Downloaded shareable card! 📸');
+  } catch (e) {
+    showToast('Failed to export image due to browser canvas restrictions.');
+  }
+}
+
+function copyShareCard() {
+  const canvas = document.getElementById('shareCanvas');
+  if (!canvas) return;
+  try {
+    canvas.toBlob((blob) => {
+      if (blob && navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+          .then(() => showToast('Card copied to clipboard! 📋'))
+          .catch(() => downloadShareCard());
+      } else {
+        downloadShareCard();
+      }
+    });
+  } catch (e) {
+    downloadShareCard();
+  }
 }
 
 function openConfirmModal(options, msgLegacy, onConfirmLegacy) {
@@ -2795,6 +3207,27 @@ document.addEventListener('click', async (e) => {
     document.getElementById('shortcutsModal')?.classList.remove('hidden');
   } else if (action === 'close-shortcuts-modal') {
     document.getElementById('shortcutsModal')?.classList.add('hidden');
+  } else if (action === 'open-share-modal') {
+    if (dropdown) dropdown.classList.add('hidden');
+    openShareModal();
+  } else if (action === 'close-share-modal') {
+    closeShareModal();
+  } else if (action === 'switch-share-mode') {
+    state.shareMode = btn.dataset.mode;
+    updateShareModalModeButtons();
+    renderShareCard();
+  } else if (action === 'share-current-modal-item') {
+    const curId = document.getElementById('fieldId')?.value;
+    if (curId) {
+      closeMediaModal(true);
+      openShareModal(curId);
+    } else {
+      showToast('Save the entry first before sharing its review card.');
+    }
+  } else if (action === 'download-share-card') {
+    downloadShareCard();
+  } else if (action === 'copy-share-card') {
+    copyShareCard();
   } else if (action === 'set-density') {
     const dens = btn.dataset.density;
     if (dens && (dens === 'grid' || dens === 'list')) {
@@ -3677,6 +4110,14 @@ if (impFile) {
   });
 }
 
+const shareItemSelectEl = document.getElementById('shareItemSelect');
+if (shareItemSelectEl) {
+  shareItemSelectEl.addEventListener('change', (e) => {
+    state.shareSelectedItemId = e.target.value;
+    renderShareCard();
+  });
+}
+
 // Genre Search Input with Realtime Auto-detection & Keyboard controls
 const genreSearch = document.getElementById('genreSearchInput');
 if (genreSearch) {
@@ -3898,6 +4339,11 @@ document.addEventListener('keydown', (e) => {
   const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select' || (activeEl && activeEl.isContentEditable);
 
   if (e.key === 'Escape') {
+    const shareModal = document.getElementById('shareModal');
+    if (shareModal && !shareModal.classList.contains('hidden')) {
+      closeShareModal();
+      return;
+    }
     const shortcutsModal = document.getElementById('shortcutsModal');
     if (shortcutsModal && !shortcutsModal.classList.contains('hidden')) {
       shortcutsModal.classList.add('hidden');
@@ -3972,6 +4418,9 @@ document.addEventListener('keydown', (e) => {
     renderNavigation();
     renderLibrary();
     showToast(`Density: ${state.viewDensity === 'list' ? 'Compact List' : 'Grid'}`);
+  } else if (e.key === 's' || e.key === 'S') {
+    e.preventDefault();
+    openShareModal();
   } else if (e.key === '?') {
     e.preventDefault();
     const shortcutsModal = document.getElementById('shortcutsModal');

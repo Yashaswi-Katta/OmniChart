@@ -168,6 +168,15 @@
               <span class="flex items-center gap-2"><span>📂</span> Import Backup / MAL / AniList</span>
               <input id="importFileInput" type="file" accept=".json,.xml,application/json,text/xml,application/xml" class="hidden" />
             </label>
+            <!-- Shareable Card Generator Option (Feature 6) -->
+            <button
+              data-action="open-share-modal"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#364146] transition"
+              title="Generate shareable 3x3 poster collage or review card"
+            >
+              <span class="flex items-center gap-2"><span>📸</span> Share Card Generator</span>
+              <span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-bold">New</span>
+            </button>
             <div class="border-t border-[#3d494f]/70 my-1"></div>
             <button
               data-action="open-shortcuts-modal"
@@ -861,14 +870,26 @@
 
       <!-- Sticky Footer Actions (F7, F9, F10) -->
       <div class="sticky bottom-0 px-4 sm:px-5 py-3 border-t border-[#3d494f] bg-[#0d0e11]/95 backdrop-blur-md flex items-center justify-between gap-2 z-10 shrink-0">
-        <button
-          type="button"
-          data-action="clear-modal-form"
-          class="h-9 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-400 hover:text-white transition"
-          title="Reset all form inputs"
-        >
-          Clear
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            data-action="share-current-modal-item"
+            id="modalShareCardBtn"
+            class="h-9 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-amber-500/40 text-xs font-semibold text-amber-300 hover:text-amber-200 transition flex items-center gap-1.5"
+            title="Generate shareable review card"
+          >
+            <span>📸</span>
+            <span class="hidden sm:inline">Share Card</span>
+          </button>
+          <button
+            type="button"
+            data-action="clear-modal-form"
+            class="h-9 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-400 hover:text-white transition"
+            title="Reset all form inputs"
+          >
+            Clear
+          </button>
+        </div>
         <div class="flex items-center gap-2">
           <button data-action="close-modal" class="h-9 px-3.5 sm:px-4 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs font-semibold text-slate-300 hover:text-white transition">
             Cancel
@@ -1001,6 +1022,10 @@
               <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">D</kbd>
             </div>
             <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
+              <span class="text-slate-200 font-medium">Open Share Card Generator</span>
+              <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">S</kbd>
+            </div>
+            <div class="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#0d0e11]">
               <span class="text-slate-200 font-medium">Close Modals / Menus</span>
               <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-slate-300 font-mono font-bold text-[11px]">Esc</kbd>
             </div>
@@ -1009,6 +1034,104 @@
               <kbd class="px-2 py-0.5 rounded bg-[#2c3539] border border-[#3d494f] text-amber-300 font-mono font-bold text-[11px]">?</kbd>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHAREABLE CARD GENERATOR MODAL (Feature 6) -->
+  <div
+    id="shareModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="shareModalTitle"
+    class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+  >
+    <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Header -->
+      <div class="px-5 py-3.5 border-b border-[#3d494f] flex items-center justify-between bg-[#0d0e11]/70 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">📸</span>
+          <div>
+            <h3 id="shareModalTitle" class="font-bold text-base text-white">Share Card Generator</h3>
+            <p class="text-[11px] text-slate-400">Export high-resolution images of your favorites or reviews</p>
+          </div>
+        </div>
+        <button data-action="close-share-modal" class="text-slate-400 hover:text-white text-lg leading-none p-1 rounded hover:bg-[#364146] transition" title="Close (Esc)">✕</button>
+      </div>
+
+      <!-- Content -->
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+        <!-- Mode Switcher -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0d0e11] p-1.5 rounded-xl border border-[#3d494f]">
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              data-action="switch-share-mode"
+              data-mode="top9"
+              id="shareModeTop9Btn"
+              class="flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-[#ff9f1c] text-[#0d0e11] shadow-sm"
+            >
+              ⭐ Top 9 Posters (3x3)
+            </button>
+            <button
+              type="button"
+              data-action="switch-share-mode"
+              data-mode="single"
+              id="shareModeSingleBtn"
+              class="flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition"
+            >
+              📝 Review Card
+            </button>
+          </div>
+
+          <!-- Single Title Selector (hidden when in top9 mode) -->
+          <div id="shareSingleItemSelectContainer" class="hidden flex-1 sm:max-w-xs">
+            <select
+              id="shareItemSelect"
+              class="w-full h-8 px-2.5 rounded-lg bg-[#2c3539] border border-[#3d494f] text-xs text-white focus:outline-none focus:border-[#ff9f1c]"
+            ></select>
+          </div>
+        </div>
+
+        <!-- Hidden canvas for rendering -->
+        <canvas id="shareCanvas" class="hidden"></canvas>
+
+        <!-- Preview Image Container -->
+        <div class="bg-[#0d0e11] border border-[#3d494f] rounded-xl p-3 flex flex-col items-center justify-center min-h-[300px]">
+          <div id="shareLoadingIndicator" class="hidden py-8 text-center space-y-2">
+            <div class="text-2xl animate-spin">✦</div>
+            <div class="text-xs text-slate-400">Rendering high-resolution card...</div>
+          </div>
+          <img
+            id="sharePreviewImg"
+            alt="Card Preview"
+            class="max-w-full max-h-[52vh] object-contain rounded-lg shadow-2xl border border-[#3d494f]"
+          />
+        </div>
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="px-5 py-3 border-t border-[#3d494f] bg-[#0d0e11]/80 flex items-center justify-between gap-3 shrink-0">
+        <span class="text-[11px] text-slate-400">Exported in crisp 1080px resolution</span>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            data-action="copy-share-card"
+            class="h-9 px-3.5 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-200 hover:text-white transition flex items-center gap-1.5"
+            title="Copy image directly to clipboard"
+          >
+            <span>📋</span>
+            <span>Copy</span>
+          </button>
+          <button
+            type="button"
+            data-action="download-share-card"
+            class="h-9 px-4 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] text-xs font-bold transition flex items-center gap-1.5 shadow"
+          >
+            <span>⬇</span>
+            <span>Download PNG</span>
+          </button>
         </div>
       </div>
     </div>
