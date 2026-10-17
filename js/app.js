@@ -605,11 +605,11 @@ function renderLibrary() {
               </div>
               <div class="flex items-center gap-1">
                 ${isOwner ? `
-                  <button data-action="step-progress" data-id="${esc(item.id)}" data-delta="-1" class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-300 font-bold leading-none text-xs">−</button>
+                  <button data-action="step-progress" data-id="${esc(item.id)}" data-delta="-1" aria-label="Decrease progress by 1" class="w-7 h-7 sm:w-6 sm:h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-300 font-bold leading-none text-xs flex items-center justify-center transition">−</button>
                 ` : ''}
                 <span class="font-mono text-xs text-slate-200 px-1 min-w-[50px] text-center">${progress}/${total}</span>
                 ${isOwner ? `
-                  <button data-action="step-progress" data-id="${esc(item.id)}" data-delta="1" class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-300 font-bold leading-none text-xs">+</button>
+                  <button data-action="step-progress" data-id="${esc(item.id)}" data-delta="1" aria-label="Increase progress by 1" class="w-7 h-7 sm:w-6 sm:h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-300 font-bold leading-none text-xs flex items-center justify-center transition">+</button>
                 ` : ''}
               </div>
             </div>
@@ -845,7 +845,8 @@ function renderLibrary() {
                         data-action="step-progress"
                         data-id="${esc(item.id)}"
                         data-delta="-1"
-                        class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold"
+                        aria-label="Decrease progress by 1"
+                        class="w-7 h-7 sm:w-6 sm:h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold flex items-center justify-center transition"
                       >\u2212</button>
                     ` : ''}
                     <span class="text-[11px] font-mono px-1.5 text-slate-200">${progress}/${total} ${esc(item.unitName || 'eps')}</span>
@@ -854,7 +855,8 @@ function renderLibrary() {
                         data-action="step-progress"
                         data-id="${esc(item.id)}"
                         data-delta="1"
-                        class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold"
+                        aria-label="Increase progress by 1"
+                        class="w-7 h-7 sm:w-6 sm:h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold flex items-center justify-center transition"
                       >+</button>
                     ` : ''}
                   </div>
