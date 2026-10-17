@@ -139,14 +139,16 @@ async function runAutoSearch(query) {
         const allNames    = Array.from(new Set(studioNodes.map((n) => n.name).filter(Boolean)));
         const studio      = (anim.length ? anim : allNames).slice(0, 2).join(', ') || 'Unknown Studio';
         results.push({
-          title:       m.title?.english || m.title?.romaji || q,
-          category:    isMovie ? 'Movies' : 'Series & Anime',
-          totalUnits:  isMovie ? 1 : (m.episodes || 12),
+          title:        m.title?.english || m.title?.romaji || q,
+          titleEnglish: m.title?.english || '',
+          titleRomaji:  m.title?.romaji || '',
+          category:     isMovie ? 'Movies' : 'Series & Anime',
+          totalUnits:   isMovie ? 1 : (m.episodes || 12),
           studio,
-          releaseDate: formatSeasonYear(m.season, m.seasonYear, m.startDate?.year),
-          genres:      (m.genres || []).slice(0, 4),
-          image:       m.coverImage?.extraLarge || m.coverImage?.large || '',
-          synopsis:    cleanHtmlSynopsis(m.description)
+          releaseDate:  formatSeasonYear(m.season, m.seasonYear, m.startDate?.year),
+          genres:       (m.genres || []).slice(0, 4),
+          image:        m.coverImage?.extraLarge || m.coverImage?.large || '',
+          synopsis:     cleanHtmlSynopsis(m.description)
         });
       }
       renderDropdown();
@@ -286,6 +288,10 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
         batch.forEach((item, idx) => {
           const media = data[`q${idx}`]?.media?.[0];
           if (!media) return;
+
+          // English & Romaji titles (L7)
+          if (media.title?.english && !item.titleEnglish) item.titleEnglish = media.title.english;
+          if (media.title?.romaji && !item.titleRomaji)   item.titleRomaji  = media.title.romaji;
 
           // Studio / Creator - Deduplicated (L3)
           const studioNodes   = media.studios?.nodes || [];

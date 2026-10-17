@@ -23,19 +23,18 @@
 </head>
 <body class="bg-[#0d0e11] text-slate-100 antialiased selection:bg-[#ff9f1c] selection:text-[#0d0e11]">
 
-  <!-- TOP NAVIGATION BAR -->
+  <!-- TOP NAVIGATION BAR (N1, N3, N4) -->
   <header class="sticky top-0 z-30 bg-[#0d0e11]/95 backdrop-blur border-b border-[#3d494f]">
-    <div class="max-w-[1600px] mx-auto px-4 h-14 flex items-center justify-between gap-3">
+    <div class="max-w-[1600px] mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2 sm:gap-3">
       
-      <!-- Left: Black Tome Menu Trigger + Brand -->
-      <div class="relative flex items-center gap-2.5">
-        <!-- Brand Header with Tagline -->
-        <div class="flex items-center gap-2.5">
+      <!-- Left: Black Tome Menu Trigger + Brand + Desktop Nav Tabs -->
+      <div class="flex items-center gap-2 shrink-0 min-w-0">
+        <div class="relative flex items-center gap-2">
           <button
             id="tomeMenuBtn"
             data-action="toggle-tome-menu"
             title="Open OmniChart Menu"
-            class="group flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] transition"
+            class="group flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] transition shrink-0"
           >
             <svg class="w-6 h-6 shrink-0" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="4" y="3" width="20" height="22" rx="2.5" fill="#0d0e11" stroke="#ff9f1c" stroke-width="1.8"/>
@@ -46,15 +45,15 @@
             </svg>
             <div class="text-left">
               <div class="font-bold tracking-tight text-white text-sm leading-none">OmniChart</div>
-              <div class="text-[9px] text-slate-400 hidden lg:block leading-none mt-1">Track shows, anime, movies, games &amp; books</div>
+              <div class="text-[9px] text-slate-400 hidden xl:block leading-none mt-1">Track shows, anime, movies, games &amp; books</div>
             </div>
-            <svg class="w-3 h-3 text-slate-400 group-hover:text-[#ff9f1c] transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3 h-3 text-slate-400 group-hover:text-[#ff9f1c] transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
 
           <!-- Desktop Primary Navigation Tabs (N1) -->
-          <nav id="desktopNav" class="hidden md:flex items-center gap-1 ml-1 bg-[#2c3539]/60 p-1 rounded-xl border border-[#3d494f]/60">
+          <nav id="desktopNav" class="hidden md:flex items-center gap-1 bg-[#2c3539]/60 p-1 rounded-xl border border-[#3d494f]/60 shrink-0">
             <button
               data-action="switch-view"
               data-view="library"
@@ -100,7 +99,7 @@
               <span class="flex items-center gap-2">
                 <span>☁️</span> Cloud Sync
               </span>
-              <span id="menuCloudBadge" class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold">Local</span>
+              <span id="menuCloudBadge" class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold">Local only</span>
             </button>
             <button
               data-action="enrich-library"
@@ -125,19 +124,19 @@
         </div>
       </div>
 
-      <!-- Center: Category Pills -->
-      <nav id="categoryNav" class="flex items-center gap-1 overflow-x-auto no-scrollbar py-1"></nav>
+      <!-- Center: Category Pills (Visible on large screens, de-crowds on smaller - N3) -->
+      <nav id="categoryNav" class="hidden xl:flex items-center gap-1 overflow-x-auto no-scrollbar py-1 shrink min-w-0"></nav>
 
-      <!-- Right: Search + Auth + Add Media -->
-      <div class="flex items-center gap-2">
-        <div class="relative w-40 sm:w-56">
+      <!-- Right: Search + Auth + Add Media (Responsive & de-crowded - N3, N4) -->
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div class="relative w-32 sm:w-44 md:w-56">
           <input
             id="librarySearchInput"
             type="text"
             placeholder="Search library..."
-            class="w-full h-9 pl-8 pr-7 rounded-lg bg-[#2c3539] border border-[#3d494f] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ff9f1c]"
+            class="w-full h-9 pl-7 sm:pl-8 pr-6 sm:pr-7 rounded-lg bg-[#2c3539] border border-[#3d494f] text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ff9f1c]"
           />
-          <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-2 sm:left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
           <button
@@ -147,44 +146,94 @@
           >✕</button>
         </div>
 
+        <!-- User Pill / Cloud Sync (N4) -->
         <button
           id="authBtn"
           data-action="open-auth-modal"
-          title="Cloud Sync & Multi-Device Access"
-          class="h-9 px-3 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] text-xs font-semibold text-slate-200 flex items-center gap-1.5 shrink-0 transition"
+          title="Cloud Sync: Local only"
+          class="h-9 px-2 sm:px-2.5 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] text-xs font-semibold text-slate-200 flex items-center gap-1.5 shrink-0 transition"
         >
           <span id="authBtnIcon">☁️</span>
           <span id="authBtnLabel" class="hidden sm:inline">Sync</span>
         </button>
 
+        <!-- Add Media Button -->
         <button
+          id="addMediaBtn"
           data-action="open-add-modal"
-          class="h-9 px-3.5 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-sm flex items-center gap-1.5 shrink-0 transition shadow"
+          class="h-9 px-2.5 sm:px-3.5 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-xs sm:text-sm flex items-center gap-1 shrink-0 transition shadow"
+          title="Add New Media Entry"
         >
-          <span>+</span>
+          <span class="text-base leading-none">+</span>
           <span class="hidden sm:inline">Add Media</span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- SUB-HEADER BAR (LIBRARY CONTROLS) -->
+  <!-- SUB-HEADER BAR (LIBRARY CONTROLS - L7, L8, L9, L10) -->
   <section id="librarySubHeader" class="bg-[#2c3539]/60 border-b border-[#3d494f]">
-    <div class="max-w-[1600px] mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2">
+    <div class="max-w-[1600px] mx-auto px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2">
       <!-- Status Tabs -->
       <div id="statusTabs" class="flex items-center gap-1 overflow-x-auto no-scrollbar"></div>
 
-      <!-- Right Tools: Sort + Enrich + Mass Remove + Export/Import -->
-      <div class="flex items-center gap-2 ml-auto">
-        <select
-          id="sortSelect"
-          class="h-8 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs text-slate-200 focus:outline-none focus:border-[#ff9f1c]"
+      <!-- Right Tools: Title Lang + Density + Sort + Direction + More Actions -->
+      <div class="flex items-center gap-1.5 sm:gap-2 ml-auto">
+        <!-- Title Language Toggle (L7: English / Romaji) -->
+        <button
+          id="titleLangToggleBtn"
+          data-action="toggle-title-lang"
+          title="Toggle Title Language (English / Romaji)"
+          class="h-8 px-2 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#3d494f] text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1"
         >
-          <option value="rating-desc">Sort: Rating (High → Low)</option>
-          <option value="updated-desc">Sort: Recently Updated</option>
-          <option value="title-asc">Sort: Title (A → Z)</option>
-          <option value="progress-desc">Sort: Progress</option>
-        </select>
+          <span id="titleLangBadge" class="text-[#ff9f1c] font-mono text-[10px] font-bold">EN</span>
+          <span id="titleLangText" class="hidden md:inline text-[11px]">English</span>
+        </button>
+
+        <!-- Density Toggle (L10: Grid vs. List) -->
+        <div class="flex items-center rounded-lg bg-[#0d0e11] border border-[#3d494f] p-0.5">
+          <button
+            id="densityGridBtn"
+            data-action="set-density"
+            data-density="grid"
+            title="Grid View"
+            class="px-1.5 py-1 rounded bg-[#2c3539] text-[#ff9f1c] text-xs transition"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          </button>
+          <button
+            id="densityListBtn"
+            data-action="set-density"
+            data-density="list"
+            title="Compact List View"
+            class="px-1.5 py-1 rounded text-slate-400 hover:text-white text-xs transition"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+        </div>
+
+        <!-- Expanded Sort Select (L8, L9) -->
+        <div class="flex items-center gap-1">
+          <select
+            id="sortSelect"
+            class="h-8 px-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs text-slate-200 focus:outline-none focus:border-[#ff9f1c] max-w-[140px] sm:max-w-none"
+          >
+            <option value="rating">Rating</option>
+            <option value="updated">Recently Updated</option>
+            <option value="date-added">Date Added</option>
+            <option value="release">Release Date</option>
+            <option value="title">Title</option>
+            <option value="progress">Progress</option>
+          </select>
+          <button
+            id="sortDirToggleBtn"
+            data-action="toggle-sort-dir"
+            title="Toggle Ascending / Descending"
+            class="h-8 w-8 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#3d494f] text-xs font-bold text-[#ff9f1c] hover:text-white flex items-center justify-center transition"
+          >
+            <span id="sortDirArrow">↓</span>
+          </button>
+        </div>
 
         <!-- More Actions Dropdown (B1) -->
         <div class="relative">
@@ -192,7 +241,7 @@
             id="moreActionsBtn"
             data-action="toggle-more-actions"
             title="More Actions"
-            class="h-8 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#3d494f] text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition"
+            class="h-8 px-2.5 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#3d494f] text-xs font-semibold text-slate-200 flex items-center gap-1 transition"
           >
             <span>•••</span>
             <span class="hidden sm:inline">Actions</span>
@@ -295,13 +344,14 @@
         >Deselect All</button>
         <button
           data-action="bulk-select-broken"
-          title="Select items with placeholder titles like 'TV (JP)Released' or 'Streaming...'"
+          title="Selects entries with scraped placeholder titles (like 'TV (JP)Released' or 'Streaming...') or missing titles"
           class="h-7 px-2.5 rounded bg-[#2c3539] hover:bg-[#364146] border border-[#ff9f1c]/40 text-xs text-[#ff9f1c] transition"
         >Select Broken Titles</button>
         <button
           data-action="bulk-select-unrated"
+          title="Select all titles without a rating score"
           class="h-7 px-2.5 rounded bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] text-xs text-slate-200 transition"
-        >Select Unrated (0★)</button>
+        >Select Unrated</button>
       </div>
 
       <div class="flex items-center gap-2">
@@ -341,7 +391,7 @@
       <div id="mediaGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
     </div>
 
-    <!-- CALENDAR VIEW -->
+    <!-- CALENDAR VIEW (C1, C2, C5) -->
     <div id="calendarView" class="hidden space-y-4">
       <div class="bg-[#2c3539] border border-[#3d494f] rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
@@ -363,25 +413,37 @@
           >Today</button>
         </div>
 
-        <!-- Clean Calendar Legend (C2) -->
-        <div class="flex items-center gap-3 text-xs text-slate-300">
-          <span class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-[#ff9f1c]"></span> Single day
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Range start
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Range end
-          </span>
+        <div class="flex items-center gap-3 sm:gap-4 flex-wrap">
+          <!-- Clean Calendar Legend (C2) -->
+          <div class="flex items-center gap-3 text-xs text-slate-300">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#ff9f1c]"></span> Single day
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Range start
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Range end
+            </span>
+          </div>
+
+          <!-- Week Start Preference (C5) -->
+          <button
+            id="calWeekStartToggle"
+            data-action="toggle-cal-week-start"
+            title="Toggle week start between Sunday and Monday"
+            class="h-8 px-2.5 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition"
+          >
+            <span class="text-slate-400 text-[10px]">Start:</span>
+            <span id="calWeekStartLabel" class="text-[#ff9f1c] font-bold">Sun</span>
+          </button>
         </div>
       </div>
 
       <div id="calendarJumpBar" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1"></div>
 
-      <div class="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-400 px-1">
-        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-      </div>
+      <!-- Dynamic Day Headers (Sun vs Mon start) -->
+      <div id="calendarDayHeaders" class="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-400 px-1"></div>
 
       <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
     </div>
@@ -406,7 +468,8 @@
             <input
               id="genreViewSearchInput"
               type="text"
-              placeholder="Search genres or titles..."
+              placeholder="Filter within Genre Explorer..."
+              title="Filters genre sections and titles displayed in Genre Explorer"
               class="w-full h-8 pl-8 pr-7 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ff9f1c]"
             />
             <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -440,19 +503,21 @@
 
   </main>
 
-  <!-- ADD / EDIT MEDIA MODAL -->
+  <!-- ADD / EDIT MEDIA MODAL (F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11) -->
   <div
     id="mediaModal"
-    class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+    class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
   >
     <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="px-5 py-3.5 border-b border-[#3d494f] flex items-center justify-between bg-[#0d0e11]/60">
+      <!-- Modal Header -->
+      <div class="px-5 py-3.5 border-b border-[#3d494f] flex items-center justify-between bg-[#0d0e11]/70 shrink-0">
         <h3 id="modalTitle" class="font-bold text-base text-white">Add Media</h3>
-        <button data-action="close-modal" class="text-slate-400 hover:text-white text-lg leading-none">✕</button>
+        <button data-action="close-modal" class="text-slate-400 hover:text-white text-lg leading-none" title="Close (Esc)">✕</button>
       </div>
 
-      <div class="p-5 overflow-y-auto space-y-4 text-sm">
-        <!-- Clean Auto-Search Bar -->
+      <!-- Scrollable Form Body -->
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-sm flex-1">
+        <!-- Clean Auto-Search Bar (Instant fill) -->
         <div class="relative">
           <input
             id="autoSearchInput"
@@ -473,10 +538,10 @@
 
         <input type="hidden" id="fieldId" />
 
-        <!-- Poster Preview + Main Fields -->
+        <!-- Poster Preview + Primary Essential Fields (F1) -->
         <div class="grid grid-cols-1 sm:grid-cols-[130px_1fr] gap-4">
           <div class="flex flex-col gap-2">
-            <div class="w-[130px] h-[190px] rounded-xl bg-[#0d0e11] border border-[#3d494f] overflow-hidden flex items-center justify-center mx-auto sm:mx-0">
+            <div class="w-[130px] h-[190px] rounded-xl bg-[#0d0e11] border border-[#3d494f] overflow-hidden flex items-center justify-center mx-auto sm:mx-0 relative">
               <img id="modalPosterPreview" src="" alt="Poster" class="w-full h-full object-cover hidden" />
               <span id="modalPosterPlaceholder" class="text-xs text-slate-500 text-center px-2">No Poster</span>
             </div>
@@ -484,12 +549,24 @@
               Upload Image
               <input id="posterUploadInput" type="file" accept="image/*" class="hidden" />
             </label>
+            <!-- Direct Image URL Input (F3) -->
+            <input
+              id="fieldImage"
+              type="url"
+              placeholder="Or paste image URL..."
+              class="w-full h-7 px-2 rounded bg-[#0d0e11] border border-[#3d494f] text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-[#ff9f1c]"
+            />
           </div>
 
           <div class="space-y-3">
             <div>
               <label class="block text-xs text-slate-300 mb-1">Title *</label>
               <input id="fieldTitle" type="text" required class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
+              <!-- Duplicate Title Warning Badge (F11) -->
+              <div id="duplicateTitleWarning" class="hidden text-[11px] text-amber-400 mt-1 flex items-center gap-1 font-medium">
+                <span>⚠️</span>
+                <span>A title with this name is already in your library</span>
+              </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2.5">
@@ -503,7 +580,7 @@
                 </select>
               </div>
               <div>
-                <label class="block text-xs text-slate-300 mb-1">Status</label>
+                <label id="labelStatus" class="block text-xs text-slate-300 mb-1">Status</label>
                 <select id="fieldStatus" class="w-full h-9 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]">
                   <option value="Ongoing">Ongoing</option>
                   <option value="Completed">Completed</option>
@@ -514,154 +591,176 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-3 gap-2.5">
+            <!-- Rating & Progress with Quick Steps (W4, F6) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label class="block text-xs text-slate-300 mb-1">Rating (0–10)</label>
+                <label class="block text-xs text-slate-300 mb-1">Rating (1–10, 0 = Unrated)</label>
                 <input id="fieldRating" type="number" min="0" max="10" step="0.5" value="0" class="w-full h-9 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
               </div>
               <div>
-                <label class="block text-xs text-slate-300 mb-1">Progress</label>
-                <input id="fieldProgress" type="number" min="0" value="0" class="w-full h-9 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
+                <div class="flex items-center justify-between mb-1">
+                  <label id="labelProgress" class="text-xs text-slate-300">Progress</label>
+                  <!-- Quick +/-5 Step Progress (F6) -->
+                  <div class="flex items-center gap-1">
+                    <button type="button" data-action="quick-step-progress" data-delta="-5" class="px-1.5 py-0.2 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-[10px] text-slate-300 font-mono">-5</button>
+                    <button type="button" data-action="quick-step-progress" data-delta="-1" class="px-1.5 py-0.2 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-[10px] text-slate-300 font-mono">-1</button>
+                    <button type="button" data-action="quick-step-progress" data-delta="1" class="px-1.5 py-0.2 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-[10px] text-slate-300 font-mono">+1</button>
+                    <button type="button" data-action="quick-step-progress" data-delta="5" class="px-1.5 py-0.2 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-[10px] text-slate-300 font-mono">+5</button>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <input id="fieldProgress" type="number" min="0" value="0" class="w-full h-9 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
+                  <input id="fieldTotalUnits" type="number" min="1" value="12" class="w-full h-9 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROGRESSIVE DISCLOSURE ACCORDION (F1) -->
+        <details id="modalMoreDetailsAccordion" class="group bg-[#0d0e11]/60 rounded-xl border border-[#3d494f] overflow-hidden transition">
+          <summary class="px-4 py-3 text-xs font-bold text-slate-300 hover:text-white cursor-pointer flex items-center justify-between select-none bg-[#0d0e11] transition">
+            <span class="flex items-center gap-2">
+              <span class="text-[#ff9f1c]">⚙️</span>
+              <span>More Details (Dates, Studio, Genres, Review, Synopsis)</span>
+            </span>
+            <span class="text-[#ff9f1c] group-open:rotate-180 transition-transform duration-200">▼</span>
+          </summary>
+
+          <div class="p-4 space-y-4 border-t border-[#3d494f]/60">
+            <!-- Studio, Release Date & Native Date Range Picker (F4) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <div class="h-6 flex items-center mb-1">
+                  <label class="text-xs text-slate-300">Studio / Creator</label>
+                </div>
+                <input id="fieldStudio" type="text" placeholder="e.g. MAPPA, Bones" class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
               </div>
               <div>
-                <label class="block text-xs text-slate-300 mb-1">Total Units</label>
-                <input id="fieldTotalUnits" type="number" min="1" value="12" class="w-full h-9 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
+                <div class="h-6 flex items-center mb-1">
+                  <label class="text-xs text-slate-300">Release Date</label>
+                </div>
+                <input id="fieldReleaseDate" type="text" placeholder="e.g. Fall 2023" class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
+              </div>
+              <!-- Native Date / Range Picker (F4) -->
+              <div>
+                <div class="h-6 flex items-center justify-between mb-1">
+                  <label class="text-xs text-[#ff9f1c] font-semibold">Calendar Date</label>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" data-action="fill-today-date" class="text-[10px] px-1.5 py-0.2 rounded bg-[#0d0e11] border border-[#3d494f] text-slate-300 hover:text-white transition">Today</button>
+                    <label class="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer select-none">
+                      <input type="checkbox" id="fieldRangeToggle" class="w-3.5 h-3.5 accent-[#ff9f1c] rounded" />
+                      <span>Add end date</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="space-y-1.5" id="datePickerContainer">
+                  <div class="flex items-center gap-1.5">
+                    <input id="fieldDateStart" type="date" class="w-full h-9 px-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white text-xs focus:outline-none focus:border-[#ff9f1c]" />
+                    <button type="button" data-action="clear-date-field" title="Clear date" class="text-xs px-2.5 h-9 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-400 hover:text-white transition">✕</button>
+                  </div>
+                  <div id="dateEndRow" class="hidden flex items-center gap-1.5">
+                    <span class="text-xs text-slate-400 shrink-0">to</span>
+                    <input id="fieldDateEnd" type="date" class="w-full h-9 px-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white text-xs focus:outline-none focus:border-[#ff9f1c]" />
+                  </div>
+                </div>
+                <input type="hidden" id="fieldConsumedDate" />
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Studio, Release Year & Date / Range (Perfect Horizontal Baseline Alignment) -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <div class="h-6 flex items-center mb-1">
-              <label class="text-xs text-slate-300">Studio / Creator</label>
-            </div>
-            <input id="fieldStudio" type="text" placeholder="e.g. MAPPA, Bones" class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
-          </div>
-          <div>
-            <div class="h-6 flex items-center mb-1">
-              <label class="text-xs text-slate-300">Release Date</label>
-            </div>
-            <input id="fieldReleaseDate" type="text" placeholder="e.g. Fall 2023" class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
-          </div>
-          <!-- Native Date / Range Picker (F4) -->
-          <div>
-            <div class="h-6 flex items-center justify-between mb-1">
-              <label class="text-xs text-[#ff9f1c] font-semibold">Calendar Date</label>
-              <div class="flex items-center gap-1.5">
-                <button type="button" data-action="fill-today-date" class="text-[10px] px-1.5 py-0.5 rounded bg-[#0d0e11] border border-[#3d494f] text-slate-300 hover:text-white transition">Today</button>
-                <label class="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer select-none">
-                  <input type="checkbox" id="fieldRangeToggle" class="w-3.5 h-3.5 accent-[#ff9f1c] rounded" />
-                  <span>Add end date</span>
+            <!-- Interactive Genre Selector & Quick-Pick System (W6) -->
+            <div class="space-y-2.5 bg-[#0d0e11]/80 p-3.5 rounded-xl border border-[#3d494f]">
+              <div class="flex items-center justify-between flex-wrap gap-1">
+                <label class="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>🏷️</span>
+                  <span>Genres</span>
+                  <span id="genreCountBadge" class="text-[10px] px-1.5 py-0.2 rounded-full bg-[#ff9f1c]/20 text-[#ff9f1c] font-mono">0</span>
                 </label>
+                <span class="text-[11px] text-slate-400">Type to find &amp; add genres • Click any tag to remove</span>
+              </div>
+
+              <!-- Active Genre Chips Container -->
+              <div id="modalGenreTags" class="min-h-[38px] p-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] flex flex-wrap items-center gap-1.5"></div>
+              <input type="hidden" id="fieldGenres" />
+
+              <!-- Genre Input with Auto-detection -->
+              <div class="relative">
+                <div class="relative">
+                  <input
+                    id="genreSearchInput"
+                    type="text"
+                    placeholder="Type genre name to search or press Enter to add custom..."
+                    autocomplete="off"
+                    class="w-full h-9 pl-8 pr-20 rounded-lg bg-[#2c3539] border border-[#3d494f] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ff9f1c]"
+                  />
+                  <svg class="w-3.5 h-3.5 text-[#ff9f1c] absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                  </svg>
+                  <button
+                    type="button"
+                    id="genreAddCustomBtn"
+                    data-action="add-custom-genre"
+                    class="hidden absolute right-1.5 top-1 px-2.5 py-1 rounded bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] text-[10px] font-bold transition shadow"
+                  >
+                    + Add
+                  </button>
+                </div>
+                <div
+                  id="genreSuggestionsDropdown"
+                  class="hidden absolute left-0 right-0 top-10 max-h-48 overflow-y-auto rounded-lg bg-[#0d0e11] border border-[#ff9f1c]/50 shadow-2xl z-30 divide-y divide-[#3d494f]/50"
+                ></div>
+              </div>
+
+              <!-- Popular Genres Tray -->
+              <div class="space-y-1.5 pt-1">
+                <div class="flex items-center justify-between text-[11px] text-slate-400">
+                  <span class="font-medium text-slate-300">Popular Genres (Click to Add):</span>
+                  <div class="flex items-center gap-1" id="genreCategoryFilter">
+                    <button type="button" data-action="filter-genre-tray" data-cat="all" class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#ff9f1c] text-[#0d0e11] transition">All</button>
+                    <button type="button" data-action="filter-genre-tray" data-cat="anime" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Anime</button>
+                    <button type="button" data-action="filter-genre-tray" data-cat="movies" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Movies</button>
+                    <button type="button" data-action="filter-genre-tray" data-cat="games" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Games</button>
+                    <button type="button" data-action="filter-genre-tray" data-cat="books" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Books</button>
+                  </div>
+                </div>
+                <div id="popularGenresTray" class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1 no-scrollbar"></div>
               </div>
             </div>
-            <div class="space-y-1.5" id="datePickerContainer">
-              <div class="flex items-center gap-1.5">
-                <input id="fieldDateStart" type="date" class="w-full h-9 px-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white text-xs focus:outline-none focus:border-[#ff9f1c]" />
-                <button type="button" data-action="clear-date-field" title="Clear date" class="text-xs px-2.5 h-9 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-400 hover:text-white transition">✕</button>
+
+            <!-- Review / Notes & Synopsis (F8) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-300 mb-1">My Review / Private Notes</label>
+                <textarea id="fieldNotes" rows="3" placeholder="Write your review, thoughts, or notes here..." class="w-full p-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]"></textarea>
               </div>
-              <div id="dateEndRow" class="hidden flex items-center gap-1.5">
-                <span class="text-xs text-slate-400 shrink-0">to</span>
-                <input id="fieldDateEnd" type="date" class="w-full h-9 px-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white text-xs focus:outline-none focus:border-[#ff9f1c]" />
-              </div>
-            </div>
-            <input type="hidden" id="fieldConsumedDate" />
-          </div>
-        </div>
-
-        <!-- Thumbnail URL -->
-        <div>
-          <label class="block text-xs text-slate-300 mb-1">Thumbnail URL</label>
-          <input id="fieldImage" type="text" placeholder="https://..." class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
-        </div>
-
-        <!-- Interactive Genre Selector & Quick-Pick System -->
-        <div class="space-y-2.5 bg-[#0d0e11]/70 p-3.5 rounded-xl border border-[#3d494f]">
-          <div class="flex items-center justify-between">
-            <label class="text-xs font-bold text-white flex items-center gap-1.5">
-              <span>🏷️</span>
-              <span>Genres</span>
-              <span id="genreCountBadge" class="text-[10px] px-1.5 py-0.2 rounded-full bg-[#ff9f1c]/20 text-[#ff9f1c] font-mono">0</span>
-            </label>
-            <span class="text-[11px] text-slate-400">Auto-detects while typing • Click to remove</span>
-          </div>
-
-          <!-- Active Popped-Out Genre Chips Container -->
-          <div id="modalGenreTags" class="min-h-[38px] p-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] flex flex-wrap items-center gap-1.5">
-            <!-- Chips rendered dynamically via JS -->
-          </div>
-
-          <!-- Hidden input keeping raw value synchronized -->
-          <input type="hidden" id="fieldGenres" />
-
-          <!-- Genre Input with Auto-detection & Custom Add -->
-          <div class="relative">
-            <div class="relative">
-              <input
-                id="genreSearchInput"
-                type="text"
-                placeholder="Type genre name to auto-detect (e.g. Action, Sci-Fi, RPG) or press Enter to add custom..."
-                autocomplete="off"
-                class="w-full h-9 pl-8 pr-20 rounded-lg bg-[#2c3539] border border-[#3d494f] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ff9f1c]"
-              />
-              <svg class="w-3.5 h-3.5 text-[#ff9f1c] absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-              </svg>
-              <button
-                type="button"
-                id="genreAddCustomBtn"
-                data-action="add-custom-genre"
-                class="hidden absolute right-1.5 top-1 px-2.5 py-1 rounded bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] text-[10px] font-bold transition shadow"
-              >
-                + Add
-              </button>
-            </div>
-
-            <!-- Auto-detect Suggestions Dropdown -->
-            <div
-              id="genreSuggestionsDropdown"
-              class="hidden absolute left-0 right-0 top-10 max-h-48 overflow-y-auto rounded-lg bg-[#0d0e11] border border-[#ff9f1c]/50 shadow-2xl z-30 divide-y divide-[#3d494f]/50"
-            ></div>
-          </div>
-
-          <!-- Prelisted Popular Genres Quick-Pick Section -->
-          <div class="space-y-1.5 pt-1">
-            <div class="flex items-center justify-between text-[11px] text-slate-400">
-              <span class="font-medium text-slate-300">Popular Genres (Click to Add):</span>
-              <div class="flex items-center gap-1" id="genreCategoryFilter">
-                <button type="button" data-action="filter-genre-tray" data-cat="all" class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#ff9f1c] text-[#0d0e11] transition">All</button>
-                <button type="button" data-action="filter-genre-tray" data-cat="anime" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Anime</button>
-                <button type="button" data-action="filter-genre-tray" data-cat="movies" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Movies</button>
-                <button type="button" data-action="filter-genre-tray" data-cat="games" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Games</button>
-                <button type="button" data-action="filter-genre-tray" data-cat="books" class="px-2 py-0.5 rounded text-[10px] text-slate-300 hover:text-white bg-[#2c3539] transition">Books</button>
+              <div>
+                <label class="block text-xs text-slate-300 mb-1">Synopsis</label>
+                <textarea id="fieldSynopsis" rows="3" placeholder="Plot summary..." class="w-full p-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]"></textarea>
               </div>
             </div>
-            <div id="popularGenresTray" class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1 no-scrollbar"></div>
           </div>
-        </div>
-
-        <!-- Review / Notes & Synopsis -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs text-slate-300 mb-1">My Review / Notes</label>
-            <textarea id="fieldNotes" rows="3" placeholder="Your thoughts..." class="w-full p-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]"></textarea>
-          </div>
-          <div>
-            <label class="block text-xs text-slate-300 mb-1">Synopsis</label>
-            <textarea id="fieldSynopsis" rows="3" placeholder="Plot summary..." class="w-full p-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]"></textarea>
-          </div>
-        </div>
+        </details>
       </div>
 
-      <div class="px-5 py-3 border-t border-[#3d494f] bg-[#0d0e11]/60 flex items-center justify-end gap-2">
-        <button data-action="close-modal" class="h-9 px-4 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs font-semibold text-slate-300 hover:text-white">
-          Cancel
+      <!-- Sticky Footer Actions (F7, F9, F10) -->
+      <div class="sticky bottom-0 px-4 sm:px-5 py-3 border-t border-[#3d494f] bg-[#0d0e11]/95 backdrop-blur-md flex items-center justify-between gap-2 z-10 shrink-0">
+        <button
+          type="button"
+          data-action="clear-modal-form"
+          class="h-9 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-400 hover:text-white transition"
+          title="Reset all form inputs"
+        >
+          Clear
         </button>
-        <button data-action="save-media" class="h-9 px-5 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] text-xs font-bold shadow">
-          Save Entry
-        </button>
+        <div class="flex items-center gap-2">
+          <button data-action="close-modal" class="h-9 px-3.5 sm:px-4 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs font-semibold text-slate-300 hover:text-white transition">
+            Cancel
+          </button>
+          <button data-action="save-media" class="h-9 px-4 sm:px-5 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] text-xs font-bold shadow transition flex items-center gap-1.5">
+            <span>Save Entry</span>
+            <span class="text-[10px] opacity-75 hidden sm:inline">(Ctrl+↵)</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

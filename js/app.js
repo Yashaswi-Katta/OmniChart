@@ -116,7 +116,46 @@ function parseDateOrRange(raw) {
 }
 
 // ---------------------------------------------------------------------------
-// Filtering & Sorting
+// State Defaults & Helpers for Density, Title Language & Sorting (L6, L7, L8, L9, L10)
+// ---------------------------------------------------------------------------
+
+state.viewDensity     = localStorage.getItem('omnichart_density') || 'grid';
+state.titleLang       = localStorage.getItem('omnichart_title_lang') || 'english';
+state.sortKey         = localStorage.getItem('omnichart_sort_key') || 'rating';
+state.sortDir         = localStorage.getItem('omnichart_sort_dir') || 'desc';
+state.weekStart       = localStorage.getItem('omnichart_week_start') || 'sun';
+state.renderLimit     = 36;
+state.expandedSynopses = state.expandedSynopses || new Set();
+
+/** Get display title according to English / Romaji toggle (L7) */
+function getItemTitle(item) {
+  if (!item) return '';
+  if (state.titleLang === 'english' && item.titleEnglish && item.titleEnglish.trim()) {
+    return item.titleEnglish.trim();
+  }
+  if (state.titleLang === 'romaji' && item.titleRomaji && item.titleRomaji.trim()) {
+    return item.titleRomaji.trim();
+  }
+  return item.title || '';
+}
+
+/** Normalize release date into a decimal year for accurate chronological sorting (L6) */
+function parseReleaseDateValue(str) {
+  if (!str || str === 'TBA') return -1;
+  const s = String(str).trim().toLowerCase();
+  const yearMatch = s.match(/\b(19\d{2}|20\d{2})\b/);
+  const year = yearMatch ? parseInt(yearMatch[1], 10) : 0;
+  if (!year) return -1;
+  let fraction = 0.5;
+  if (s.includes('winter')) fraction = 0.1;
+  else if (s.includes('spring')) fraction = 0.4;
+  else if (s.includes('summer')) fraction = 0.7;
+  else if (s.includes('fall') || s.includes('autumn')) fraction = 0.9;
+  return year + fraction;
+}
+
+// ---------------------------------------------------------------------------
+// Filtering & Sorting (L8, L9)
 // ---------------------------------------------------------------------------
 
 function getFilteredItems() {
@@ -128,18 +167,40 @@ function getFilteredItems() {
       if (itemStatus !== state.status) return false;
     }
     if (q) {
-      const hay = `${item.title} ${item.studio || ''} ${(item.genres || []).join(' ')} ${item.consumedDate || ''}`.toLowerCase();
+      const eng = item.titleEnglish || '';
+      const rom = item.titleRomaji || '';
+      const hay = `${item.title} ${eng} ${rom} ${item.studio || ''} ${(item.genres || []).join(' ')} ${item.consumedDate || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   });
 
+  const sortKey = state.sortKey || 'rating';
+  const sortDir = state.sortDir || 'desc';
+  const dir = sortDir === 'asc' ? 1 : -1;
+
   filtered.sort((a, b) => {
-    if (state.sort === 'rating-desc')   return (b.rating   || 0) - (a.rating   || 0);
-    if (state.sort === 'updated-desc')  return (b.updatedAt || 0) - (a.updatedAt || 0);
-    if (state.sort === 'title-asc')     return (a.title || '').localeCompare(b.title || '');
-    if (state.sort === 'progress-desc') return (b.progress || 0) - (a.progress || 0);
-    return 0;
+    let diff = 0;
+    if (sortKey === 'rating') {
+      diff = (Number(a.rating) || 0) - (Number(b.rating) || 0);
+    } else if (sortKey === 'updated') {
+      diff = (Number(a.updatedAt) || 0) - (Number(b.updatedAt) || 0);
+    } else if (sortKey === 'date-added') {
+      const timeA = parseInt(String(a.id || '').replace(/\D/g, ''), 10) || Number(a.updatedAt || 0);
+      const timeB = parseInt(String(b.id || '').replace(/\D/g, ''), 10) || Number(b.updatedAt || 0);
+      diff = timeA - timeB;
+    } else if (sortKey === 'release') {
+      diff = parseReleaseDateValue(a.releaseDate) - parseReleaseDateValue(b.releaseDate);
+    } else if (sortKey === 'title') {
+      diff = getItemTitle(a).localeCompare(getItemTitle(b));
+    } else if (sortKey === 'progress') {
+      diff = (Number(a.progress) || 0) - (Number(b.progress) || 0);
+    }
+
+    if (diff !== 0) return diff * dir;
+
+    // Deterministic secondary sort (L8: Recently Updated -> A to Z)
+    return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0) || (a.title || '').localeCompare(b.title || '');
   });
 
   return filtered;
@@ -228,23 +289,53 @@ function renderNavigation() {
         return st === 'All' ? true : itemStatus === st;
       }).length;
       const active = state.status === st;
+      const isZero = count === 0 && st !== 'All' && !active;
       return `<button
         data-action="set-status"
         data-status="${esc(st)}"
         class="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap flex items-center gap-1.5 transition ${
           active
-            ? 'bg-[#ff9f1c] text-[#0d0e11] font-bold'
-            : 'bg-[#0d0e11] text-slate-300 hover:text-white border border-[#3d494f]'
+            ? 'bg-[#ff9f1c] text-[#0d0e11] font-bold shadow-sm'
+            : isZero
+              ? 'bg-[#0d0e11]/50 text-slate-500 border border-[#3d494f]/40 opacity-40 hover:opacity-80'
+              : 'bg-[#0d0e11] text-slate-300 hover:text-white border border-[#3d494f]'
         }"
       >
         <span>${esc(st)}</span>
-        <span class="text-[10px] px-1.5 py-0.2 rounded ${active ? 'bg-[#0d0e11]/20 text-[#0d0e11]' : 'bg-[#2c3539] text-slate-400'}">${count}</span>
+        <span class="text-[10px] px-1.5 py-0.2 rounded ${active ? 'bg-[#0d0e11]/20 text-[#0d0e11]' : isZero ? 'bg-[#0d0e11] text-slate-600' : 'bg-[#2c3539] text-slate-400'}">${count}</span>
       </button>`;
     }).join('');
   }
 
+  // Update Toolbar Toggles (L7, L9, L10)
+  const langBadge = document.getElementById('titleLangBadge');
+  const langText  = document.getElementById('titleLangText');
+  if (langBadge) langBadge.textContent = state.titleLang === 'romaji' ? 'JA' : 'EN';
+  if (langText)  langText.textContent  = state.titleLang === 'romaji' ? 'Romaji' : 'English';
+
+  const gridBtn = document.getElementById('densityGridBtn');
+  const listBtn = document.getElementById('densityListBtn');
+  if (gridBtn && listBtn) {
+    if (state.viewDensity === 'list') {
+      listBtn.className = 'px-1.5 py-1 rounded bg-[#2c3539] text-[#ff9f1c] text-xs transition';
+      gridBtn.className = 'px-1.5 py-1 rounded text-slate-400 hover:text-white text-xs transition';
+    } else {
+      gridBtn.className = 'px-1.5 py-1 rounded bg-[#2c3539] text-[#ff9f1c] text-xs transition';
+      listBtn.className = 'px-1.5 py-1 rounded text-slate-400 hover:text-white text-xs transition';
+    }
+  }
+
+  const sortSel = document.getElementById('sortSelect');
+  if (sortSel && sortSel.value !== state.sortKey) {
+    sortSel.value = state.sortKey || 'rating';
+  }
+
+  const dirArrow = document.getElementById('sortDirArrow');
+  if (dirArrow) {
+    dirArrow.textContent = state.sortDir === 'asc' ? '↑' : '↓';
+  }
+
   const bulkToolbar = document.getElementById('bulkToolbar');
-  const bulkModeBtn = document.getElementById('bulkModeBtn');
   if (bulkToolbar) {
     if (state.bulkMode) {
       bulkToolbar.classList.remove('hidden');
@@ -283,32 +374,67 @@ function renderNavigation() {
 }
 
 // ---------------------------------------------------------------------------
-// Cloud Sync & Multi-User Authentication Engine
+// Cloud Sync & Multi-User Authentication Engine (N4, S5, W3)
 // ---------------------------------------------------------------------------
 
 function renderAuthStatus() {
   const iconEl  = document.getElementById('authBtnIcon');
   const labelEl = document.getElementById('authBtnLabel');
+  const btnEl   = document.getElementById('authBtn');
   const badgeEl = document.getElementById('menuCloudBadge');
 
   if (state.user) {
-    const displayName = state.user.email ? state.user.email.split('@')[0] : 'User';
-    if (iconEl)  iconEl.textContent  = '🟢';
-    if (labelEl) labelEl.textContent = displayName;
-    if (badgeEl) {
-      badgeEl.textContent = 'Synced';
-      badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold';
+    let displayName = 'User';
+    if (state.user.user_metadata?.full_name) {
+      displayName = state.user.user_metadata.full_name;
+    } else if (state.user.user_metadata?.name) {
+      displayName = state.user.user_metadata.name;
+    } else if (state.user.email) {
+      const prefix = state.user.email.split('@')[0];
+      displayName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
     }
-  } else if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured()) {
-    if (iconEl)  iconEl.textContent  = '☁️';
-    if (labelEl) labelEl.textContent = 'Sync';
+
+    const monogram = (displayName.slice(0, 2) || 'US').toUpperCase();
+    let statusTooltip = 'Synced';
+    let dotClass = 'bg-emerald-400';
+
+    if (state.cloudStatus === 'syncing') {
+      statusTooltip = 'Syncing...';
+      dotClass = 'bg-amber-400 animate-pulse';
+    } else if (state.cloudStatus === 'offline') {
+      statusTooltip = 'Offline (changes saved locally)';
+      dotClass = 'bg-slate-400';
+    } else if (state.cloudStatus === 'error') {
+      statusTooltip = 'Sync error (click to retry)';
+      dotClass = 'bg-rose-500';
+    }
+
+    if (iconEl) {
+      iconEl.innerHTML = `
+        <span class="relative flex items-center justify-center w-5 h-5 rounded-full bg-[#ff9f1c] text-[#0d0e11] font-bold text-[10px]">
+          <span title="${statusTooltip}" class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ${dotClass} ring-1 ring-[#0d0e11]"></span>
+          ${esc(monogram)}
+        </span>
+      `;
+    }
+    if (labelEl) labelEl.textContent = displayName;
+    if (btnEl)   btnEl.title = `Signed in as ${displayName} (${statusTooltip})`;
     if (badgeEl) {
-      badgeEl.textContent = 'Local only';
-      badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold';
+      badgeEl.textContent = statusTooltip;
+      badgeEl.className   = `text-[10px] uppercase px-1.5 py-0.5 rounded font-bold ${
+        state.cloudStatus === 'syncing'
+          ? 'bg-amber-500/20 text-amber-300'
+          : state.cloudStatus === 'offline'
+            ? 'bg-slate-500/20 text-slate-300'
+            : state.cloudStatus === 'error'
+              ? 'bg-rose-500/20 text-rose-300'
+              : 'bg-emerald-500/20 text-emerald-400'
+      }`;
     }
   } else {
     if (iconEl)  iconEl.textContent  = '☁️';
     if (labelEl) labelEl.textContent = 'Sync';
+    if (btnEl)   btnEl.title         = 'Local only (this device) - Click to sign in and sync';
     if (badgeEl) {
       badgeEl.textContent = 'Local only';
       badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold';
@@ -402,182 +528,372 @@ function renderLibrary() {
   }
 
   const isOwner = OwnerMode.isOwner();
+  const visibleItems = items.slice(0, state.renderLimit);
+  const hasMore = items.length > state.renderLimit;
 
-  grid.innerHTML = items.map((item) => {
-    const rating        = Number(item.rating || 0);
-    const isMasterpiece = rating >= 9;
-    const progress      = Number(item.progress || 0);
-    const total         = Math.max(1, Number(item.totalUnits || 1));
-    const pct           = Math.min(100, Math.round((progress / total) * 100));
-    const activeTab     = state.cardTab[item.id] || (item.notes ? 'notes' : 'synopsis');
-    const bodyText      = activeTab === 'notes'
-      ? (item.notes || 'No review notes added yet.')
-      : (item.synopsis || 'No synopsis available.');
-    const isSelected    = state.selectedIds.has(item.id);
-    const posterSrc     = item.image || makeFallbackPoster(item.title);
-    const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
-    const cleanStudio   = Array.from(new Set((item.studio || 'Unknown Studio').split(',').map((s) => s.trim()).filter(Boolean))).join(', ') || 'Unknown Studio';
+  // Density Mode: List View (L10)
+  if (state.viewDensity === 'list') {
+    grid.className = 'flex flex-col gap-2.5';
+    grid.innerHTML = visibleItems.map((item) => {
+      const rating        = Number(item.rating || 0);
+      const isMasterpiece = rating >= 9;
+      const progress      = Number(item.progress || 0);
+      const total         = Math.max(1, Number(item.totalUnits || 1));
+      const pct           = Math.min(100, Math.round((progress / total) * 100));
+      const isSelected    = state.selectedIds.has(item.id);
+      const posterSrc     = item.image || makeFallbackPoster(item.title);
+      const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+      const displayTitle  = getItemTitle(item);
+      const cleanStudio   = Array.from(new Set((item.studio || 'Unknown Studio').split(',').map((s) => s.trim()).filter(Boolean))).join(', ') || 'Unknown Studio';
 
-    return `
-      <article
-        data-card-id="${esc(item.id)}"
-        data-action="${state.bulkMode ? 'toggle-select-card' : ''}"
-        class="group relative bg-[#2c3539] rounded-xl overflow-hidden flex flex-col border transition ${
-          state.bulkMode
-            ? isSelected
-              ? 'border-rose-500 ring-2 ring-rose-500/40 cursor-pointer'
-              : 'border-[#3d494f] hover:border-rose-400/60 cursor-pointer'
-            : 'border-[#3d494f] hover:border-[#ff9f1c]/60'
-        }"
-      >
-        <!-- Top Title Header -->
-        <div class="px-3.5 py-2.5 bg-[#0d0e11]/60 border-b border-[#3d494f] flex items-start justify-between gap-2">
-          <div class="min-w-0 flex items-start gap-2">
+      let statusBadgeClass = 'bg-[#0d0e11] text-slate-300 border border-[#3d494f]';
+      if (displayStatus === 'Ongoing')        statusBadgeClass = 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
+      else if (displayStatus === 'Completed') statusBadgeClass = 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+      else if (displayStatus === 'Planning')  statusBadgeClass = 'bg-sky-500/15 text-sky-300 border border-sky-500/30';
+      else if (displayStatus === 'On Hold')   statusBadgeClass = 'bg-purple-500/15 text-purple-300 border border-purple-500/30';
+      else if (displayStatus === 'Dropped')   statusBadgeClass = 'bg-rose-500/15 text-rose-300 border border-rose-500/30';
+
+      return `
+        <article
+          data-card-id="${esc(item.id)}"
+          data-action="${state.bulkMode ? 'toggle-select-card' : ''}"
+          class="group relative bg-[#2c3539] hover:bg-[#323d42] rounded-xl border ${
+            state.bulkMode && isSelected
+              ? 'border-rose-500 ring-2 ring-rose-500/30'
+              : 'border-[#3d494f] hover:border-[#ff9f1c]/50'
+          } p-2.5 sm:p-3 flex items-center justify-between gap-3 transition"
+        >
+          <div class="flex items-center gap-3 min-w-0 flex-1">
             ${state.bulkMode ? `
-              <input
-                type="checkbox"
-                ${isSelected ? 'checked' : ''}
-                class="mt-0.5 w-4 h-4 accent-rose-500 rounded pointer-events-none"
-              />
+              <input type="checkbox" ${isSelected ? 'checked' : ''} class="w-4 h-4 accent-rose-500 pointer-events-none shrink-0" />
             ` : ''}
-            <div class="min-w-0">
-              <h3 class="font-bold text-sm text-white truncate" title="${esc(item.title)}">${esc(item.title)}</h3>
-              <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                <span>${esc(item.category || 'Series & Anime')}</span>
-                <span>\u2022</span>
-                <span class="${item.releaseDate && item.releaseDate !== 'TBA' ? 'text-slate-200 font-medium' : ''}">${esc(item.releaseDate || 'TBA')}</span>
-                ${item.consumedDate ? `
-                  <span>\u2022</span>
-                  <button
-                    data-action="jump-to-item-date"
-                    data-date="${esc(item.consumedDate)}"
-                    class="text-[#ff9f1c] hover:underline font-medium"
-                    title="View on Calendar"
-                  >\uD83D\uDCC5 ${esc(item.consumedDate)}</button>
-                ` : ''}
-              </div>
-            </div>
-          </div>
-
-          ${(!state.bulkMode && isOwner) ? `
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-              <button
-                data-action="edit-item"
-                data-id="${esc(item.id)}"
-                title="Edit"
-                class="p-1 rounded bg-[#2c3539] hover:bg-[#364146] text-slate-300 hover:text-white text-xs"
-              >\u270E</button>
-              <button
-                data-action="delete-item"
-                data-id="${esc(item.id)}"
-                title="Remove"
-                class="p-1 rounded bg-[#2c3539] hover:bg-rose-600 text-slate-300 hover:text-white text-xs"
-              >\u2715</button>
-            </div>
-          ` : ''}
-        </div>
-
-        <!-- Studio & Popped-Out Genres Ribbon (L3) -->
-        <div class="px-3.5 py-1.5 bg-[#0d0e11]/50 border-b border-[#3d494f] flex items-center justify-between gap-2 text-[11px]">
-          <span class="font-semibold text-slate-300 truncate text-xs" title="${esc(cleanStudio)}">${esc(cleanStudio)}</span>
-          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            ${(item.genres || []).map((g) => `
-              <button
-                type="button"
-                data-action="filter-by-genre"
-                data-genre="${esc(g)}"
-                title="Filter library by ${esc(g)}"
-                class="px-2 py-0.5 rounded-full bg-[#ff9f1c]/15 text-[#ff9f1c] hover:bg-[#ff9f1c] hover:text-[#0d0e11] border border-[#ff9f1c]/40 font-bold text-[10px] tracking-wide whitespace-nowrap transition shadow-sm"
-              >${esc(g)}</button>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Card Body -->
-        <div class="flex flex-1 min-h-[185px]">
-          <div class="relative w-[125px] shrink-0 bg-[#0d0e11] border-r border-[#3d494f]">
             <img
               src="${esc(posterSrc)}"
               alt="${esc(item.title)}"
               data-fallback-title="${esc(item.title)}"
-              class="poster-img w-full h-full object-cover"
+              class="poster-img w-10 h-14 object-cover rounded-lg bg-[#0d0e11] shrink-0 border border-[#3d494f]"
               loading="lazy"
               referrerpolicy="no-referrer"
             />
-            <button
-              data-action="${isOwner ? 'edit-item' : 'view-item'}"
-              data-id="${esc(item.id)}"
-              title="${isOwner ? 'Click to rate or edit' : 'Rating'}"
-              class="absolute top-2 left-2 px-2 py-0.5 rounded-md text-xs font-extrabold shadow-md flex items-center gap-1 ${
-                isMasterpiece
-                  ? 'bg-[#ff9f1c] text-[#0d0e11]'
-                  : rating > 0
-                    ? 'bg-[#0d0e11]/90 text-white border border-[#ff9f1c]/60'
-                    : 'bg-[#0d0e11]/80 text-slate-400 border border-[#3d494f]'
-              }"
-            >
-              <span>\u2605</span>
-              <span>${rating > 0 ? rating.toFixed(1).replace(/\.0$/, '') : '\u2013'}</span>
-            </button>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <h4
+                  class="font-bold text-sm text-white truncate cursor-pointer hover:text-[#ff9f1c] transition"
+                  data-action="${isOwner ? 'edit-item' : 'view-item'}"
+                  data-id="${esc(item.id)}"
+                  title="${esc(displayTitle)}"
+                >
+                  ${esc(displayTitle)}
+                </h4>
+                <span class="text-[10px] px-2 py-0.2 rounded-full font-bold shrink-0 ${statusBadgeClass}">${esc(displayStatus)}</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
+                <span class="text-slate-300">${esc(item.category)}</span>
+                <span>•</span>
+                <span class="truncate">${esc(cleanStudio)}</span>
+                ${item.releaseDate && item.releaseDate !== 'TBA' ? `<span>•</span><span>${esc(item.releaseDate)}</span>` : ''}
+                ${item.consumedDate ? `<span>•</span><span class="text-[#ff9f1c]">📅 ${esc(item.consumedDate)}</span>` : ''}
+              </div>
+            </div>
           </div>
 
-          <div class="flex-1 flex flex-col justify-between p-3 min-w-0">
-            <div class="space-y-1.5">
-              <div class="flex items-center gap-1 border-b border-[#3d494f]/70 pb-1">
-                <button
-                  data-action="switch-card-tab"
-                  data-id="${esc(item.id)}"
-                  data-tab="notes"
-                  class="text-[11px] font-semibold px-2 py-0.5 rounded ${
-                    activeTab === 'notes' ? 'bg-[#0d0e11] text-[#ff9f1c]' : 'text-slate-400 hover:text-white'
-                  }"
-                >Review</button>
-                <button
-                  data-action="switch-card-tab"
-                  data-id="${esc(item.id)}"
-                  data-tab="synopsis"
-                  class="text-[11px] font-semibold px-2 py-0.5 rounded ${
-                    activeTab === 'synopsis' ? 'bg-[#0d0e11] text-[#ff9f1c]' : 'text-slate-400 hover:text-white'
-                  }"
-                >Synopsis</button>
+          <div class="flex items-center gap-3 sm:gap-4 shrink-0">
+            <!-- Progress Bar & +/- -->
+            <div class="flex items-center gap-2">
+              <div class="hidden md:block w-20 h-1.5 rounded-full bg-[#0d0e11] overflow-hidden">
+                <div class="h-full bg-[#ff9f1c]" style="width:${pct}%"></div>
               </div>
-              <p class="text-xs text-slate-300 leading-relaxed line-clamp-4 overflow-y-auto max-h-[84px] pr-1">
-                ${esc(bodyText)}
-              </p>
+              <div class="flex items-center gap-1">
+                ${isOwner ? `
+                  <button data-action="step-progress" data-id="${esc(item.id)}" data-delta="-1" class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-300 font-bold leading-none text-xs">−</button>
+                ` : ''}
+                <span class="font-mono text-xs text-slate-200 px-1 min-w-[50px] text-center">${progress}/${total}</span>
+                ${isOwner ? `
+                  <button data-action="step-progress" data-id="${esc(item.id)}" data-delta="1" class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-300 font-bold leading-none text-xs">+</button>
+                ` : ''}
+              </div>
             </div>
 
-            <div class="pt-2 mt-2 border-t border-[#3d494f]/80 space-y-1.5">
-              <div class="w-full h-1.5 rounded-full bg-[#0d0e11] overflow-hidden">
-                <div class="h-full bg-[#ff9f1c] transition-all" style="width:${pct}%"></div>
+            <!-- Rating (W4) -->
+            <div class="w-16 text-right">
+              ${rating > 0 ? `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-extrabold ${
+                  isMasterpiece ? 'bg-[#ff9f1c] text-[#0d0e11]' : 'bg-[#0d0e11] text-[#ff9f1c] border border-[#ff9f1c]/40'
+                }">
+                  <span>★</span>
+                  <span>${rating.toFixed(1).replace(/\.0$/, '')}</span>
+                </span>
+              ` : `
+                <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] text-slate-500 border border-[#3d494f]">
+                  <span>☆</span>
+                  <span>Unrated</span>
+                </span>
+              `}
+            </div>
+
+            ${(!state.bulkMode && isOwner) ? `
+              <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                <button data-action="edit-item" data-id="${esc(item.id)}" title="Edit" class="p-1 rounded bg-[#0d0e11] hover:bg-[#364146] text-slate-300 text-xs">✎</button>
+                <button data-action="delete-item" data-id="${esc(item.id)}" title="Delete" class="p-1 rounded bg-[#0d0e11] hover:bg-rose-600 text-slate-300 text-xs">✕</button>
               </div>
-              <div class="flex items-center justify-between gap-2 text-xs">
-                <span class="text-[11px] font-semibold text-slate-300">${esc(displayStatus)}</span>
-                <div class="flex items-center gap-1">
-                  ${isOwner ? `
+            ` : ''}
+          </div>
+        </article>
+      `;
+    }).join('');
+  } else {
+    // Density Mode: Visual Cards Grid View
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
+    grid.innerHTML = visibleItems.map((item) => {
+      const rating        = Number(item.rating || 0);
+      const isMasterpiece = rating >= 9;
+      const progress      = Number(item.progress || 0);
+      const total         = Math.max(1, Number(item.totalUnits || 1));
+      const pct           = Math.min(100, Math.round((progress / total) * 100));
+      const hasNotes      = Boolean(item.notes && item.notes.trim());
+      let   activeTab     = state.cardTab[item.id] || (hasNotes ? 'notes' : 'synopsis');
+      if (!hasNotes && activeTab === 'notes') activeTab = 'synopsis';
+
+      const bodyText      = activeTab === 'notes'
+        ? (item.notes || 'No review notes added yet.')
+        : (item.synopsis || 'No synopsis available.');
+      const isSelected    = state.selectedIds.has(item.id);
+      const posterSrc     = item.image || makeFallbackPoster(item.title);
+      const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+      const displayTitle  = getItemTitle(item);
+      const cleanStudio   = Array.from(new Set((item.studio || 'Unknown Studio').split(',').map((s) => s.trim()).filter(Boolean))).join(', ') || 'Unknown Studio';
+      const isExpanded    = state.expandedSynopses?.has(item.id);
+      const needsToggle   = (bodyText || '').length > 160;
+
+      // Genre pills with +N overflow badge (L2)
+      const genres = Array.isArray(item.genres) ? item.genres : [];
+      const maxShown = 3;
+      const shownGenres = genres.slice(0, maxShown);
+      const remainingCount = genres.length - maxShown;
+
+      return `
+        <article
+          data-card-id="${esc(item.id)}"
+          data-action="${state.bulkMode ? 'toggle-select-card' : ''}"
+          class="group relative bg-[#2c3539] rounded-xl overflow-hidden flex flex-col border transition ${
+            state.bulkMode
+              ? isSelected
+                ? 'border-rose-500 ring-2 ring-rose-500/40 cursor-pointer'
+                : 'border-[#3d494f] hover:border-rose-400/60 cursor-pointer'
+              : 'border-[#3d494f] hover:border-[#ff9f1c]/60'
+          }"
+        >
+          <!-- Top Title Header -->
+          <div class="px-3.5 py-2.5 bg-[#0d0e11]/60 border-b border-[#3d494f] flex items-start justify-between gap-2">
+            <div class="min-w-0 flex items-start gap-2">
+              ${state.bulkMode ? `
+                <input
+                  type="checkbox"
+                  ${isSelected ? 'checked' : ''}
+                  class="mt-0.5 w-4 h-4 accent-rose-500 rounded pointer-events-none"
+                />
+              ` : ''}
+              <div class="min-w-0">
+                <h3 class="font-bold text-sm text-white truncate" title="${esc(displayTitle)}">${esc(displayTitle)}</h3>
+                <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                  <span>${esc(item.category || 'Series & Anime')}</span>
+                  <span>\u2022</span>
+                  <span class="${item.releaseDate && item.releaseDate !== 'TBA' ? 'text-slate-200 font-medium' : ''}">${esc(item.releaseDate || 'TBA')}</span>
+                  ${item.consumedDate ? `
+                    <span>\u2022</span>
                     <button
-                      data-action="step-progress"
-                      data-id="${esc(item.id)}"
-                      data-delta="-1"
-                      class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold"
-                    >\u2212</button>
-                  ` : ''}
-                  <span class="text-[11px] font-mono px-1.5 text-slate-200">${progress}/${total} ${esc(item.unitName || 'eps')}</span>
-                  ${isOwner ? `
-                    <button
-                      data-action="step-progress"
-                      data-id="${esc(item.id)}"
-                      data-delta="1"
-                      class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold"
-                    >+</button>
+                      data-action="jump-to-item-date"
+                      data-date="${esc(item.consumedDate)}"
+                      class="text-[#ff9f1c] hover:underline font-medium"
+                      title="View on Calendar"
+                    >\uD83D\uDCC5 ${esc(item.consumedDate)}</button>
                   ` : ''}
                 </div>
               </div>
             </div>
+
+            ${(!state.bulkMode && isOwner) ? `
+              <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+                <button
+                  data-action="edit-item"
+                  data-id="${esc(item.id)}"
+                  title="Edit"
+                  class="p-1 rounded bg-[#2c3539] hover:bg-[#364146] text-slate-300 hover:text-white text-xs"
+                >\u270E</button>
+                <button
+                  data-action="delete-item"
+                  data-id="${esc(item.id)}"
+                  title="Remove"
+                  class="p-1 rounded bg-[#2c3539] hover:bg-rose-600 text-slate-300 hover:text-white text-xs"
+                >\u2715</button>
+              </div>
+            ` : ''}
           </div>
-        </div>
-      </article>
+
+          <!-- Studio & Popped-Out Genres Ribbon (L2, L3) -->
+          <div class="px-3.5 py-1.5 bg-[#0d0e11]/50 border-b border-[#3d494f] flex items-center justify-between gap-2 text-[11px]">
+            <span class="font-semibold text-slate-300 truncate text-xs" title="${esc(cleanStudio)}">${esc(cleanStudio)}</span>
+            <div class="flex items-center gap-1 shrink-0 flex-wrap">
+              ${shownGenres.map((g) => `
+                <button
+                  type="button"
+                  data-action="filter-by-genre"
+                  data-genre="${esc(g)}"
+                  title="Filter library by ${esc(g)}"
+                  class="px-2 py-0.5 rounded-full bg-[#ff9f1c]/15 text-[#ff9f1c] hover:bg-[#ff9f1c] hover:text-[#0d0e11] border border-[#ff9f1c]/40 font-bold text-[10px] tracking-wide whitespace-nowrap transition shadow-sm"
+                >${esc(g)}</button>
+              `).join('')}
+              ${remainingCount > 0 ? `
+                <span
+                  class="px-1.5 py-0.5 rounded-full bg-[#0d0e11] text-[#ff9f1c] border border-[#3d494f] text-[10px] font-bold tracking-wide"
+                  title="${esc(genres.slice(maxShown).join(', '))}"
+                >+${remainingCount}</span>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="flex flex-1 min-h-[185px]">
+            <div class="relative w-[125px] shrink-0 bg-[#0d0e11] border-r border-[#3d494f]">
+              <img
+                src="${esc(posterSrc)}"
+                alt="${esc(item.title)}"
+                data-fallback-title="${esc(item.title)}"
+                class="poster-img w-full h-full object-cover"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+              />
+              <button
+                data-action="${isOwner ? 'edit-item' : 'view-item'}"
+                data-id="${esc(item.id)}"
+                title="${isOwner ? 'Click to rate or edit' : 'Rating'}"
+                class="absolute top-2 left-2 px-2 py-0.5 rounded-md text-xs font-extrabold shadow-md flex items-center gap-1 ${
+                  isMasterpiece
+                    ? 'bg-[#ff9f1c] text-[#0d0e11]'
+                    : rating > 0
+                      ? 'bg-[#0d0e11]/90 text-white border border-[#ff9f1c]/60'
+                      : 'bg-[#0d0e11]/80 text-slate-400 border border-[#3d494f]'
+                }"
+              >
+                <span>\u2605</span>
+                <span>${rating > 0 ? rating.toFixed(1).replace(/\.0$/, '') : '\u2013'}</span>
+              </button>
+            </div>
+
+            <div class="flex-1 flex flex-col justify-between p-3 min-w-0">
+              <div class="space-y-1.5">
+                <!-- Clean Review/Synopsis Tab Header (L5) -->
+                <div class="flex items-center justify-between border-b border-[#3d494f]/70 pb-1">
+                  <div class="flex items-center gap-1">
+                    ${hasNotes ? `
+                      <button
+                        data-action="switch-card-tab"
+                        data-id="${esc(item.id)}"
+                        data-tab="notes"
+                        class="text-[11px] font-semibold px-2 py-0.5 rounded ${
+                          activeTab === 'notes' ? 'bg-[#0d0e11] text-[#ff9f1c]' : 'text-slate-400 hover:text-white'
+                        }"
+                      >Review</button>
+                    ` : ''}
+                    <button
+                      data-action="switch-card-tab"
+                      data-id="${esc(item.id)}"
+                      data-tab="synopsis"
+                      class="text-[11px] font-semibold px-2 py-0.5 rounded ${
+                        activeTab === 'synopsis' ? 'bg-[#0d0e11] text-[#ff9f1c]' : 'text-slate-400 hover:text-white'
+                      }"
+                    >Synopsis</button>
+                  </div>
+                  ${(!hasNotes && isOwner) ? `
+                    <button
+                      type="button"
+                      data-action="edit-item-focus-review"
+                      data-id="${esc(item.id)}"
+                      class="text-[10px] text-slate-400 hover:text-[#ff9f1c] transition flex items-center gap-1"
+                      title="Add your review"
+                    >
+                      <span>+ Review</span>
+                    </button>
+                  ` : ''}
+                </div>
+
+                <!-- Synopsis Text without tiny scrollbar, clean line clamping & toggle (L4) -->
+                <div>
+                  <p class="text-xs text-slate-300 leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}">
+                    ${esc(bodyText)}
+                  </p>
+                  ${needsToggle ? `
+                    <button
+                      type="button"
+                      data-action="toggle-card-synopsis"
+                      data-id="${esc(item.id)}"
+                      class="text-[10px] text-[#ff9f1c] hover:underline font-bold mt-1 inline-block"
+                    >${isExpanded ? '▲ Show less' : '▼ Read more'}</button>
+                  ` : ''}
+                </div>
+              </div>
+
+              <div class="pt-2 mt-2 border-t border-[#3d494f]/80 space-y-1.5">
+                <div class="w-full h-1.5 rounded-full bg-[#0d0e11] overflow-hidden">
+                  <div class="h-full bg-[#ff9f1c] transition-all" style="width:${pct}%"></div>
+                </div>
+                <div class="flex items-center justify-between gap-2 text-xs">
+                  <span class="text-[11px] font-semibold text-slate-300">${esc(displayStatus)}</span>
+                  <div class="flex items-center gap-1">
+                    ${isOwner ? `
+                      <button
+                        data-action="step-progress"
+                        data-id="${esc(item.id)}"
+                        data-delta="-1"
+                        class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold"
+                      >\u2212</button>
+                    ` : ''}
+                    <span class="text-[11px] font-mono px-1.5 text-slate-200">${progress}/${total} ${esc(item.unitName || 'eps')}</span>
+                    ${isOwner ? `
+                      <button
+                        data-action="step-progress"
+                        data-id="${esc(item.id)}"
+                        data-delta="1"
+                        class="w-6 h-6 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-bold"
+                      >+</button>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  // Pagination / Load More Bar (L10: Handles 400+ titles smoothly)
+  if (hasMore) {
+    const moreEl = document.createElement('div');
+    moreEl.className = 'col-span-full py-4 text-center space-y-2';
+    moreEl.innerHTML = `
+      <div class="text-xs text-slate-400">
+        Showing <strong>${visibleItems.length}</strong> of <strong>${items.length}</strong> titles
+      </div>
+      <div class="flex items-center justify-center gap-2">
+        <button
+          type="button"
+          data-action="load-more-items"
+          class="px-4 py-2 rounded-xl bg-[#2c3539] hover:bg-[#364146] text-[#ff9f1c] font-bold text-xs border border-[#3d494f] hover:border-[#ff9f1c] transition shadow"
+        >
+          Show More (+36)
+        </button>
+        <button
+          type="button"
+          data-action="load-all-items"
+          class="px-4 py-2 rounded-xl bg-[#0d0e11] hover:bg-[#2c3539] text-slate-300 font-semibold text-xs border border-[#3d494f] transition"
+        >
+          Show All (${items.length})
+        </button>
+      </div>
     `;
-  }).join('');
+    grid.appendChild(moreEl);
+  }
 
   grid.querySelectorAll('img.poster-img').forEach((img) => {
     img.addEventListener('error', function handleImgErr() {
@@ -663,7 +979,25 @@ function renderCalendar() {
     }
   }
 
-  const firstDayWeek = new Date(state.calYear, state.calMonth, 1).getDay();
+  // Week Start Setting (C5: Sunday vs. Monday)
+  const weekStart = state.weekStart || 'sun';
+  const labelStart = document.getElementById('calWeekStartLabel');
+  if (labelStart) labelStart.textContent = weekStart === 'mon' ? 'Mon' : 'Sun';
+
+  // Dynamic Day of Week Headers (C5)
+  const dayHeadersEl = document.getElementById('calendarDayHeaders');
+  if (dayHeadersEl) {
+    const dayNames = weekStart === 'mon'
+      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayHeadersEl.innerHTML = dayNames.map((d) => `<div>${d}</div>`).join('');
+  }
+
+  let firstDayWeek = new Date(state.calYear, state.calMonth, 1).getDay();
+  if (weekStart === 'mon') {
+    firstDayWeek = (firstDayWeek + 6) % 7;
+  }
+
   const daysInMonth  = new Date(state.calYear, state.calMonth + 1, 0).getDate();
   const today        = new Date();
   const isOwner      = OwnerMode.isOwner();
@@ -688,7 +1022,7 @@ function renderCalendar() {
               data-action="add-on-date"
               data-date="${dateStr}"
               title="Add Media on ${dateStr}"
-              class="w-5 h-5 rounded bg-[#0d0e11] hover:bg-[#ff9f1c] text-slate-300 hover:text-[#0d0e11] text-xs font-bold leading-none border border-[#3d494f] hover:border-[#ff9f1c] transition"
+              class="w-7 h-7 sm:w-6 sm:h-6 rounded-lg bg-[#0d0e11] hover:bg-[#ff9f1c] text-white hover:text-[#0d0e11] text-xs font-extrabold flex items-center justify-center border border-[#3d494f] hover:border-[#ff9f1c] transition shadow-sm"
             >+</button>
           ` : ''}
         </div>
@@ -700,6 +1034,7 @@ function renderCalendar() {
                 ? 'bg-emerald-400 text-[#0d0e11]'
                 : 'bg-sky-400 text-[#0d0e11]';
             const badgeLabel = badge === 'DAY' ? 'Day' : badge === 'START' ? 'Start' : 'End';
+            const itemTitle = getItemTitle(item);
             return `
               <button
                 data-action="edit-item"
@@ -707,7 +1042,7 @@ function renderCalendar() {
                 class="w-full text-left p-1 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] flex items-center gap-1.5 text-[11px]"
               >
                 <span class="px-1 rounded text-[9px] font-extrabold ${badgeCls}">${badgeLabel}</span>
-                <span class="truncate text-slate-100 font-medium">${esc(item.title)}</span>
+                <span class="truncate text-slate-100 font-medium">${esc(itemTitle)}</span>
               </button>
             `;
           }).join('')}
@@ -777,7 +1112,9 @@ function renderGenreView() {
         return entry;
       }
       const matchingItems = entry.items.filter((item) => {
-        return (item.title || '').toLowerCase().includes(q) ||
+        const title = getItemTitle(item);
+        return (title || '').toLowerCase().includes(q) ||
+               (item.title || '').toLowerCase().includes(q) ||
                (item.studio || '').toLowerCase().includes(q);
       });
       return {
@@ -800,8 +1137,8 @@ function renderGenreView() {
     entry.avgRating = avgRating;
     entry.completedCount = completedCount;
 
-    // Sort items inside this genre: rating descending, then title ascending
-    entry.items.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0) || (a.title || '').localeCompare(b.title || ''));
+    // Sort items inside this genre: rating descending, then title ascending (L7)
+    entry.items.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0) || (getItemTitle(a) || '').localeCompare(getItemTitle(b) || ''));
   }
 
   // Sort genres
@@ -841,24 +1178,33 @@ function renderGenreView() {
     }
   }
 
-  // Empty State
+  // Empty State (G6)
   if (genreEntries.length === 0) {
+    const isLibraryEmpty = state.items.length === 0;
     grid.innerHTML = `
       <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-10 text-center space-y-3">
         <div class="text-3xl">🏷️</div>
-        <div class="text-base font-bold text-white">No genres found</div>
+        <div class="text-base font-bold text-white">${state.genreSearch ? 'No genres found' : 'No genres in your library yet'}</div>
         <p class="text-xs text-slate-400">
-          ${state.genreSearch ? 'No genres or titles match your search filter.' : 'Your library has no genres assigned yet.'}
+          ${state.genreSearch
+            ? 'No genres or titles match your search filter.'
+            : (isLibraryEmpty
+                ? 'Your library is currently empty. Add your first title to start organizing by genre!'
+                : 'Add titles with genres or fetch details to see them grouped here.')}
         </p>
         ${state.genreSearch ? `
           <button data-action="clear-genre-search" class="px-4 py-2 rounded-lg bg-[#ff9f1c] text-[#0d0e11] font-bold text-xs transition hover:bg-[#ffb144]">
             Clear Genre Search
           </button>
+        ` : (isLibraryEmpty ? `
+          <button data-action="open-add-modal" class="px-4 py-2 rounded-lg bg-[#ff9f1c] text-[#0d0e11] font-bold text-xs transition hover:bg-[#ffb144]">
+            + Add Your First Title
+          </button>
         ` : `
           <button data-action="enrich-library" class="px-4 py-2 rounded-lg bg-[#ff9f1c] text-[#0d0e11] font-bold text-xs transition hover:bg-[#ffb144]">
-            ⚡ Enrich Metadata to Auto-Fill Genres
+            ⚡ Fetch details (poster, genres, synopsis)
           </button>
-        `}
+        `)}
       </div>
     `;
     return;
@@ -884,7 +1230,12 @@ function renderGenreView() {
           <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2">
               <span class="text-lg text-[#ff9f1c]">🏷️</span>
-              <h3 class="text-base sm:text-lg font-bold text-white tracking-wide">${esc(entry.name)}</h3>
+              <h3
+                data-action="open-genre-in-library"
+                data-genre="${esc(entry.name)}"
+                class="text-base sm:text-lg font-bold text-white tracking-wide cursor-pointer hover:text-[#ff9f1c] transition"
+                title="Filter library by ${esc(entry.name)}"
+              >${esc(entry.name)}</h3>
             </div>
             <span class="text-xs px-2.5 py-0.5 rounded-full bg-[#ff9f1c]/15 text-[#ff9f1c] border border-[#ff9f1c]/40 font-bold">
               ${entry.items.length} ${entry.items.length === 1 ? 'title' : 'titles'}
@@ -923,12 +1274,13 @@ function renderGenreView() {
           </div>
         </div>
 
-        <!-- Media Cards Grid (Paginated first 12 cards - G1) -->
+        <!-- Media Cards Grid (Paginated first 12 cards - G1, G2, L7) -->
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
           ${visibleItems.map((item) => {
+            const title = getItemTitle(item);
             const rating = Number(item.rating || 0);
             const isMasterpiece = rating >= 9;
-            const posterSrc = item.image || makeFallbackPoster(item.title);
+            const posterSrc = item.image || makeFallbackPoster(title);
             const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
             const progress = Number(item.progress || 0);
             const total = Math.max(1, Number(item.totalUnits || 1));
@@ -945,14 +1297,14 @@ function renderGenreView() {
                 data-action="edit-item"
                 data-id="${esc(item.id)}"
                 class="group relative bg-[#0d0e11] hover:bg-[#1a1f23] border border-[#3d494f] hover:border-[#ff9f1c] rounded-xl overflow-hidden shadow transition duration-200 flex flex-col cursor-pointer"
-                title="${esc(item.title)} (${displayStatus})"
+                title="${esc(title)} (${displayStatus})"
               >
                 <!-- Poster Image & Overlays -->
                 <div class="relative w-full aspect-[2/3] bg-[#0d0e11] overflow-hidden">
                   <img
                     src="${esc(posterSrc)}"
-                    alt="${esc(item.title)}"
-                    data-fallback-title="${esc(item.title)}"
+                    alt="${esc(title)}"
+                    data-fallback-title="${esc(title)}"
                     class="poster-img w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     loading="lazy"
                     referrerpolicy="no-referrer"
@@ -974,8 +1326,8 @@ function renderGenreView() {
 
                 <!-- Info Footer -->
                 <div class="p-2 flex flex-col justify-between flex-1 min-w-0">
-                  <h4 class="font-bold text-xs text-white line-clamp-2 leading-tight group-hover:text-[#ff9f1c] transition" title="${esc(item.title)}">
-                    ${esc(item.title)}
+                  <h4 class="font-bold text-xs text-white line-clamp-2 leading-tight group-hover:text-[#ff9f1c] transition" title="${esc(title)}">
+                    ${esc(title)}
                   </h4>
                   <div class="mt-1.5 pt-1 border-t border-[#3d494f]/50 flex items-center justify-between text-[10px] text-slate-400">
                     <span class="truncate pr-1">${esc(item.category || '')}</span>
@@ -1190,7 +1542,8 @@ function handleGenreSearchInput(query) {
 }
 
 // ---------------------------------------------------------------------------
-// Modal Helpers
+// ---------------------------------------------------------------------------
+// Modal Helpers & Category-Aware Fields (F1, F2, F3, F5, F8, F11)
 // ---------------------------------------------------------------------------
 
 function updateModalPosterPreview(url) {
@@ -1206,6 +1559,122 @@ function updateModalPosterPreview(url) {
     img.classList.add('hidden');
     ph.classList.remove('hidden');
   }
+}
+
+function updateCategoryAwareFormFields() {
+  const cat = document.getElementById('fieldCategory')?.value || 'Series & Anime';
+  const labelProg = document.getElementById('labelProgress');
+  const labelStat = document.getElementById('labelStatus');
+  const statusSel = document.getElementById('fieldStatus');
+  const curStatus = statusSel?.value || 'Ongoing';
+  const totalUnits = document.getElementById('fieldTotalUnits');
+
+  if (cat === 'Movies') {
+    if (labelProg) labelProg.textContent = 'Progress (Parts / Movies)';
+    if (labelStat) labelStat.textContent = 'Viewing Status';
+    if (totalUnits && (!totalUnits.value || totalUnits.value === '12')) {
+      totalUnits.value = '1';
+    }
+    if (statusSel) {
+      statusSel.innerHTML = `
+        <option value="Completed">Watched</option>
+        <option value="Ongoing">Watching</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Planning">Planning</option>
+        <option value="Dropped">Dropped</option>
+      `;
+      statusSel.value = (curStatus === 'Completed' || curStatus === 'Watched') ? 'Completed' : curStatus;
+    }
+  } else if (cat === 'Games') {
+    if (labelProg) labelProg.textContent = 'Progress (Hours / Chapters)';
+    if (labelStat) labelStat.textContent = 'Playing Status';
+    if (statusSel) {
+      statusSel.innerHTML = `
+        <option value="Completed">Beaten / Finished</option>
+        <option value="Ongoing">Playing</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Planning">Planning</option>
+        <option value="Dropped">Dropped</option>
+      `;
+      statusSel.value = (curStatus === 'Completed' || curStatus === 'Beaten') ? 'Completed' : curStatus;
+    }
+  } else if (cat === 'Books') {
+    if (labelProg) labelProg.textContent = 'Progress (Chapters / Pages)';
+    if (labelStat) labelStat.textContent = 'Reading Status';
+    if (statusSel) {
+      statusSel.innerHTML = `
+        <option value="Completed">Read</option>
+        <option value="Ongoing">Reading</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Planning">Planning</option>
+        <option value="Dropped">Dropped</option>
+      `;
+      statusSel.value = (curStatus === 'Completed' || curStatus === 'Read') ? 'Completed' : curStatus;
+    }
+  } else {
+    // Series & Anime
+    if (labelProg) labelProg.textContent = 'Progress (Episodes)';
+    if (labelStat) labelStat.textContent = 'Watch Status';
+    if (statusSel) {
+      statusSel.innerHTML = `
+        <option value="Ongoing">Watching / Ongoing</option>
+        <option value="Completed">Completed</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Planning">Planning</option>
+        <option value="Dropped">Dropped</option>
+      `;
+      statusSel.value = (curStatus === 'Watched' || curStatus === 'Beaten' || curStatus === 'Read') ? 'Completed' : curStatus;
+    }
+  }
+}
+
+function checkDuplicateTitle(title, currentId) {
+  const warning = document.getElementById('duplicateTitleWarning');
+  const existingEl = document.getElementById('duplicateTitleExisting');
+  if (!warning) return;
+  const t = (title || '').trim().toLowerCase();
+  if (!t) {
+    warning.classList.add('hidden');
+    return;
+  }
+  const match = state.items.find(i => i.id !== currentId && (i.title || '').trim().toLowerCase() === t);
+  if (match) {
+    if (existingEl) existingEl.textContent = match.title;
+    warning.classList.remove('hidden');
+  } else {
+    warning.classList.add('hidden');
+  }
+}
+
+function getModalFormSnapshot() {
+  return JSON.stringify({
+    title: document.getElementById('fieldTitle')?.value?.trim() || '',
+    category: document.getElementById('fieldCategory')?.value || '',
+    status: document.getElementById('fieldStatus')?.value || '',
+    rating: document.getElementById('fieldRating')?.value || '0',
+    progress: document.getElementById('fieldProgress')?.value || '0',
+    totalUnits: document.getElementById('fieldTotalUnits')?.value || '12',
+    studio: document.getElementById('fieldStudio')?.value?.trim() || '',
+    releaseDate: document.getElementById('fieldReleaseDate')?.value?.trim() || '',
+    consumedDate: document.getElementById('fieldConsumedDate')?.value?.trim() || '',
+    image: document.getElementById('fieldImage')?.value?.trim() || '',
+    notes: document.getElementById('fieldNotes')?.value?.trim() || '',
+    synopsis: document.getElementById('fieldSynopsis')?.value?.trim() || '',
+    genres: currentModalGenres || []
+  });
+}
+
+function closeMediaModal(force = false) {
+  if (!force && state.modalInitialSnapshot) {
+    const cur = getModalFormSnapshot();
+    if (cur !== state.modalInitialSnapshot) {
+      if (!confirm('You have unsaved changes in this form. Discard changes?')) {
+        return;
+      }
+    }
+  }
+  document.getElementById('mediaModal')?.classList.add('hidden');
+  state.modalInitialSnapshot = null;
 }
 
 function openMediaModal(item = null, presetDate = '') {
@@ -1268,10 +1737,11 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('fieldId').value              = item.id;
     document.getElementById('fieldTitle').value            = item.title || '';
     document.getElementById('fieldCategory').value         = catVal;
+    updateCategoryAwareFormFields();
     document.getElementById('fieldStatus').value           = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : (item.status || 'Ongoing');
     document.getElementById('fieldRating').value           = item.rating ?? 0;
     document.getElementById('fieldProgress').value         = item.progress ?? 0;
-    document.getElementById('fieldTotalUnits').value       = item.totalUnits ?? 12;
+    document.getElementById('fieldTotalUnits').value       = item.totalUnits ?? (catVal === 'Movies' ? 1 : 12);
     document.getElementById('fieldStudio').value           = item.studio || '';
     document.getElementById('fieldReleaseDate').value      = item.releaseDate || '';
     document.getElementById('fieldImage').value            = item.image || '';
@@ -1287,10 +1757,11 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('fieldId').value              = '';
     document.getElementById('fieldTitle').value            = '';
     document.getElementById('fieldCategory').value         = catVal;
+    updateCategoryAwareFormFields();
     document.getElementById('fieldStatus').value           = 'Ongoing';
     document.getElementById('fieldRating').value           = 0;
-    document.getElementById('fieldProgress').value         = 12;
-    document.getElementById('fieldTotalUnits').value       = 12;
+    document.getElementById('fieldProgress').value         = 0;
+    document.getElementById('fieldTotalUnits').value       = (catVal === 'Movies' ? 1 : 12);
     document.getElementById('fieldStudio').value           = '';
     document.getElementById('fieldReleaseDate').value      = '';
     document.getElementById('fieldImage').value            = '';
@@ -1299,6 +1770,16 @@ function openMediaModal(item = null, presetDate = '') {
     updateModalPosterPreview('');
 
     currentModalGenres = [];
+  }
+
+  // Check duplicate title badge (F11)
+  const curId = item ? item.id : '';
+  checkDuplicateTitle(document.getElementById('fieldTitle').value, curId);
+
+  // Progressive disclosure accordion (F1): open if item has details filled in, else closed
+  const acc = document.getElementById('modalMoreDetailsAccordion');
+  if (acc) {
+    acc.open = !!(item && (item.notes || item.consumedDate || item.synopsis || (item.genres && item.genres.length > 0) || item.studio || item.releaseDate));
   }
 
   // Set active genre category pill
@@ -1313,6 +1794,7 @@ function openMediaModal(item = null, presetDate = '') {
   renderModalGenreTags();
   renderPopularGenresTray(mappedCategory);
 
+  state.modalInitialSnapshot = getModalFormSnapshot();
   document.getElementById('mediaModal').classList.remove('hidden');
 }
 
@@ -1416,6 +1898,7 @@ function saveMediaFromModal() {
   }
 
   saveItems();
+  state.modalInitialSnapshot = null;
   document.getElementById('mediaModal').classList.add('hidden');
   renderAll();
   showToast('Saved entry');
@@ -1511,7 +1994,68 @@ document.addEventListener('click', async (e) => {
   } else if (action === 'open-add-modal') {
     openMediaModal(null);
   } else if (action === 'close-modal') {
-    document.getElementById('mediaModal').classList.add('hidden');
+    closeMediaModal(false);
+  } else if (action === 'clear-modal-form') {
+    document.getElementById('fieldTitle').value = '';
+    document.getElementById('fieldRating').value = '0';
+    document.getElementById('fieldProgress').value = '0';
+    document.getElementById('fieldTotalUnits').value = '12';
+    document.getElementById('fieldStudio').value = '';
+    document.getElementById('fieldReleaseDate').value = '';
+    document.getElementById('fieldImage').value = '';
+    document.getElementById('fieldNotes').value = '';
+    document.getElementById('fieldSynopsis').value = '';
+    const dStart = document.getElementById('fieldDateStart');
+    const dEnd   = document.getElementById('fieldDateEnd');
+    const dRaw   = document.getElementById('fieldConsumedDate');
+    const rTog   = document.getElementById('fieldRangeToggle');
+    const endRow = document.getElementById('dateEndRow');
+    if (dStart) dStart.value = '';
+    if (dEnd)   dEnd.value   = '';
+    if (dRaw)   dRaw.value   = '';
+    if (rTog)   rTog.checked = false;
+    if (endRow) endRow.classList.add('hidden');
+    currentModalGenres = [];
+    renderModalGenreTags();
+    updateModalPosterPreview('');
+    checkDuplicateTitle('', null);
+    showToast('Form cleared');
+  } else if (action === 'quick-step-progress') {
+    const delta = parseInt(btn.dataset.delta, 10) || 0;
+    const progInp = document.getElementById('fieldProgress');
+    const totInp  = document.getElementById('fieldTotalUnits');
+    if (progInp) {
+      const cur = parseInt(progInp.value, 10) || 0;
+      const tot = parseInt(totInp?.value, 10) || 1;
+      const next = Math.max(0, cur + delta);
+      progInp.value = next;
+      const statSel = document.getElementById('fieldStatus');
+      if (tot > 0 && next >= tot && statSel && statSel.value === 'Ongoing') {
+        statSel.value = 'Completed';
+      }
+    }
+  } else if (action === 'toggle-title-lang') {
+    state.titleLang = state.titleLang === 'romaji' ? 'english' : 'romaji';
+    try { localStorage.setItem('omnichart_title_lang', state.titleLang); } catch (e) {}
+    renderNavigation();
+    renderAll();
+    showToast(`Display titles: ${state.titleLang === 'romaji' ? 'Romaji' : 'English'}`);
+  } else if (action === 'set-density') {
+    const dens = btn.dataset.density;
+    if (dens && (dens === 'grid' || dens === 'list')) {
+      state.viewDensity = dens;
+      try { localStorage.setItem('omnichart_density', dens); } catch (e) {}
+      renderNavigation();
+      renderLibrary();
+    }
+  } else if (action === 'toggle-sort-dir') {
+    state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    renderNavigation();
+    renderLibrary();
+  } else if (action === 'toggle-cal-week-start') {
+    state.weekStart = state.weekStart === 'monday' ? 'sunday' : 'monday';
+    try { localStorage.setItem('omnichart_week_start', state.weekStart); } catch (e) {}
+    renderCalendar();
   } else if (action === 'save-media') {
     saveMediaFromModal();
   } else if (action === 'edit-item') {
@@ -2203,10 +2747,12 @@ if (genreSearch) {
   });
 }
 
-// Update popular genre tray when category changes in modal
+// Update modal category-aware fields and popular genre tray (F2)
 const modalCatSelect = document.getElementById('fieldCategory');
 if (modalCatSelect) {
   modalCatSelect.addEventListener('change', (e) => {
+    updateCategoryAwareFormFields();
+
     const catVal = e.target.value;
     let mappedCategory = 'all';
     if (catVal.includes('Anime')) mappedCategory = 'anime';
@@ -2223,6 +2769,47 @@ if (modalCatSelect) {
     });
 
     renderPopularGenresTray(mappedCategory);
+  });
+}
+
+// Status-aware progress defaults (F5)
+const modalStatusSelect = document.getElementById('fieldStatus');
+if (modalStatusSelect) {
+  modalStatusSelect.addEventListener('change', (e) => {
+    const val = (typeof normalizeStatus === 'function') ? normalizeStatus(e.target.value) : e.target.value;
+    const progInp = document.getElementById('fieldProgress');
+    const totInp  = document.getElementById('fieldTotalUnits');
+    if (val === 'Completed' && progInp && totInp) {
+      progInp.value = totInp.value || 1;
+    } else if (val === 'Planning' && progInp) {
+      progInp.value = 0;
+    }
+  });
+}
+
+// Duplicate title detection on input (F11)
+const modalTitleInput = document.getElementById('fieldTitle');
+if (modalTitleInput) {
+  modalTitleInput.addEventListener('input', (e) => {
+    const curId = document.getElementById('fieldId')?.value || '';
+    checkDuplicateTitle(e.target.value, curId);
+  });
+}
+
+// Media Modal Backdrop & Keyboard Shortcut Listeners (F8, F10)
+const mediaModalEl = document.getElementById('mediaModal');
+if (mediaModalEl) {
+  mediaModalEl.addEventListener('click', (e) => {
+    if (e.target === mediaModalEl) {
+      closeMediaModal(false);
+    }
+  });
+
+  mediaModalEl.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      saveMediaFromModal();
+    }
   });
 }
 
@@ -2280,6 +2867,15 @@ document.addEventListener('keydown', (e) => {
     const authModal = document.getElementById('authModal');
     if (authModal && !authModal.classList.contains('hidden')) {
       authModal.classList.add('hidden');
+    }
+    const mediaModal = document.getElementById('mediaModal');
+    if (mediaModal && !mediaModal.classList.contains('hidden')) {
+      closeMediaModal(false);
+    }
+    const confirmModal = document.getElementById('confirmModal');
+    if (confirmModal && !confirmModal.classList.contains('hidden')) {
+      confirmModal.classList.add('hidden');
+      state.pendingConfirmFn = null;
     }
   }
 });

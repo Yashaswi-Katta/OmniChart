@@ -229,6 +229,43 @@ function sanitizeAndRecoverItems(list) {
 }
 
 // ---------------------------------------------------------------------------
+// Conflict Resolution (S3: Deterministic Last-Write-Wins)
+// ---------------------------------------------------------------------------
+
+function mergeLibraries(localList, remoteList) {
+  const byId = new Map();
+  for (const item of (localList || [])) {
+    if (item && item.id) byId.set(item.id, item);
+  }
+  for (const remote of (remoteList || [])) {
+    if (!remote || !remote.id) continue;
+    const local = byId.get(remote.id);
+    if (!local) {
+      byId.set(remote.id, remote);
+    } else {
+      const localTime = Number(local.updatedAt || 0);
+      const remoteTime = Number(remote.updatedAt || 0);
+      if (remoteTime >= localTime) {
+        byId.set(remote.id, remote);
+      }
+    }
+  }
+  return Array.from(byId.values());
+}
+window.mergeLibraries = mergeLibraries;
+
+// Listen for network reconnect to flush offline sync queue (S4)
+window.addEventListener('online', () => {
+  if (typeof CloudSync !== 'undefined' && CloudSync.flushOfflineQueue) {
+    CloudSync.flushOfflineQueue();
+  }
+});
+window.addEventListener('offline', () => {
+  state.cloudStatus = 'offline';
+  if (typeof renderAuthStatus === 'function') renderAuthStatus();
+});
+
+// ---------------------------------------------------------------------------
 // localStorage persistence
 // ---------------------------------------------------------------------------
 
@@ -242,12 +279,12 @@ function loadItems() {
         if (sanitizeAndRecoverItems(state.items)) {
           saveItems();
         }
-        // If cloud sync provider is active, pull cloud data
+        // If cloud sync provider is active, pull cloud data and merge
         if (OMNICHART_CONFIG.cloudProvider !== 'localStorage') {
           CloudSync.pull().then((cloudItems) => {
             if (cloudItems && cloudItems.length > 0) {
-              state.items = cloudItems;
-              saveItems();
+              state.items = mergeLibraries(state.items, cloudItems);
+              saveItems(false);
               if (typeof renderAll === 'function') renderAll();
             }
           });
@@ -487,12 +524,26 @@ const CloudSync = {
   },
 
   /** Push items to user's isolated cloud table (Upsert) */
+  /** Push items to user's isolated cloud table (Upsert) - S3, S4, S5 */
   async push(items) {
     if (!state.user || !Array.isArray(items) || items.length === 0) return { ok: true, count: 0 };
+    
+    // S4: If offline, queue changes locally
+    if (!navigator.onLine) {
+      this.queueOffline(items);
+      return { ok: true, queued: true };
+    }
+
     const client = this.getClient();
-    if (!client) return { error: new Error('Supabase client not initialized') };
+    if (!client) {
+      this.queueOffline(items);
+      return { error: new Error('Supabase client not initialized') };
+    }
 
     try {
+      state.cloudStatus = 'syncing';
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
+
       const rows = items.map((item) => ({
         id: item.id,
         user_id: state.user.id,
@@ -519,14 +570,57 @@ const CloudSync = {
 
       if (error) {
         console.warn('[CloudSync] Upsert error:', error.message);
+        state.cloudStatus = 'error';
+        if (typeof renderAuthStatus === 'function') renderAuthStatus();
+        this.queueOffline(items);
         return { error };
       }
+
       this._lastLocalPushTime = Date.now();
+      state.cloudStatus = 'connected';
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
       return { ok: true, count: rows.length };
     } catch (err) {
       console.warn('[CloudSync] Push exception:', err);
+      state.cloudStatus = 'offline';
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
+      this.queueOffline(items);
       return { error: err };
     }
+  },
+
+  /** S4: Queue items in localStorage when offline or network fails */
+  queueOffline(items) {
+    try {
+      const raw = localStorage.getItem('omnichart_offline_sync_queue');
+      const queue = raw ? JSON.parse(raw) : [];
+      const merged = mergeLibraries(queue, items);
+      localStorage.setItem('omnichart_offline_sync_queue', JSON.stringify(merged));
+      state.cloudStatus = 'offline';
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
+    } catch (e) {}
+  },
+
+  /** S4: Flush offline queue when network is restored */
+  async flushOfflineQueue() {
+    try {
+      const raw = localStorage.getItem('omnichart_offline_sync_queue');
+      if (!raw) return;
+      const pending = JSON.parse(raw);
+      if (Array.isArray(pending) && pending.length > 0 && navigator.onLine && state.user) {
+        state.cloudStatus = 'syncing';
+        if (typeof renderAuthStatus === 'function') renderAuthStatus();
+        const res = await this.push(pending);
+        if (res && res.ok) {
+          localStorage.removeItem('omnichart_offline_sync_queue');
+          state.cloudStatus = 'connected';
+          if (typeof renderAuthStatus === 'function') renderAuthStatus();
+          if (typeof showToast === 'function') {
+            showToast(`⚡ Back online: Synced ${pending.length} pending items to cloud`);
+          }
+        }
+      }
+    } catch (e) {}
   },
 
   /** Delete a single item from the cloud */
@@ -546,7 +640,7 @@ const CloudSync = {
     }
   },
 
-  /** Pull all items for the authenticated user */
+  /** Pull all items for the authenticated user - S3 Last-Write-Wins */
   async pull() {
     if (!state.user) return null;
     const client = this.getClient();
@@ -561,6 +655,8 @@ const CloudSync = {
 
       if (error) {
         console.warn('[CloudSync] Pull error:', error.message);
+        state.cloudStatus = 'error';
+        if (typeof renderAuthStatus === 'function') renderAuthStatus();
         return null;
       }
 
@@ -586,11 +682,13 @@ const CloudSync = {
       }
     } catch (err) {
       console.warn('[CloudSync] Pull exception:', err);
+      state.cloudStatus = 'offline';
+      if (typeof renderAuthStatus === 'function') renderAuthStatus();
     }
     return null;
   },
 
-  /** Subscribe to realtime postgres changes for the current user */
+  /** Subscribe to realtime postgres changes for the current user - S3 Conflict Resolution */
   subscribe() {
     if (!state.user) return;
     const client = this.getClient();
@@ -617,7 +715,8 @@ const CloudSync = {
             const isSelfPush = timeSincePush < 4000;
             const remoteItems = await this.pull();
             if (remoteItems) {
-              state.items = remoteItems;
+              // S3: Merge with last-write-wins
+              state.items = mergeLibraries(state.items, remoteItems);
               saveItems(false);
               if (typeof renderAll === 'function') renderAll();
               if (!isSelfPush && typeof showToast === 'function') {
