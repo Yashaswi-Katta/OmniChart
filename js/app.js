@@ -270,6 +270,16 @@ function renderNavigation() {
   if (tomeNavCal)   tomeNavCal.className   = (state.view === 'calendar') ? tomeActiveCls : tomeInactiveCls;
   if (tomeNavGenre) tomeNavGenre.className = (state.view === 'genre')    ? tomeActiveCls : tomeInactiveCls;
 
+  const tomeNavStats = document.getElementById('tomeNavStats');
+  const tomeNavStatsCount = document.getElementById('tomeNavStatsCount');
+  if (tomeNavStats) tomeNavStats.className = (state.view === 'stats') ? tomeActiveCls : tomeInactiveCls;
+  if (tomeNavStatsCount) {
+    const total = state.items.length;
+    const completed = state.items.filter(i => (typeof normalizeStatus === 'function' ? normalizeStatus(i.status) : i.status) === 'Completed').length;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    tomeNavStatsCount.textContent = `${pct}%`;
+  }
+
   // Desktop Primary Navigation Tabs active state (if present)
   const topNavLib   = document.getElementById('topNavLibrary');
   const topNavCal   = document.getElementById('topNavCalendar');
@@ -286,10 +296,12 @@ function renderNavigation() {
   const mNavLib   = document.getElementById('mobileNavLibrary');
   const mNavCal   = document.getElementById('mobileNavCalendar');
   const mNavGenre = document.getElementById('mobileNavGenre');
+  const mNavStats = document.getElementById('mobileNavStats');
 
-  if (mNavLib)   mNavLib.className   = `flex flex-col items-center gap-0.5 ${state.view === 'library' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
-  if (mNavCal)   mNavCal.className   = `flex flex-col items-center gap-0.5 ${state.view === 'calendar' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
-  if (mNavGenre) mNavGenre.className = `flex flex-col items-center gap-0.5 ${state.view === 'genre' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
+  if (mNavLib)   mNavLib.className   = `flex flex-col items-center justify-center min-w-[54px] min-h-[44px] gap-0.5 ${state.view === 'library' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
+  if (mNavCal)   mNavCal.className   = `flex flex-col items-center justify-center min-w-[54px] min-h-[44px] gap-0.5 ${state.view === 'calendar' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
+  if (mNavGenre) mNavGenre.className = `flex flex-col items-center justify-center min-w-[54px] min-h-[44px] gap-0.5 ${state.view === 'genre' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
+  if (mNavStats) mNavStats.className = `flex flex-col items-center justify-center min-w-[54px] min-h-[44px] gap-0.5 ${state.view === 'stats' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
 
   // Actions Tab: Category Filters Dropdown (User Requests 2 & 3)
   const curCatLabel = document.getElementById('currentCategoryLabel');
@@ -1545,26 +1557,413 @@ function renderAll() {
   const libSub    = document.getElementById('librarySubHeader');
   const calView   = document.getElementById('calendarView');
   const genreView = document.getElementById('genreView');
+  const statsView = document.getElementById('statsView');
 
   if (state.view === 'library') {
     if (libView)   libView.classList.remove('hidden');
     if (libSub)    libSub.classList.remove('hidden');
     if (calView)   calView.classList.add('hidden');
     if (genreView) genreView.classList.add('hidden');
+    if (statsView) statsView.classList.add('hidden');
     renderLibrary();
   } else if (state.view === 'calendar') {
     if (libView)   libView.classList.add('hidden');
     if (libSub)    libSub.classList.add('hidden');
     if (calView)   calView.classList.remove('hidden');
     if (genreView) genreView.classList.add('hidden');
+    if (statsView) statsView.classList.add('hidden');
     renderCalendar();
   } else if (state.view === 'genre') {
     if (libView)   libView.classList.add('hidden');
     if (libSub)    libSub.classList.add('hidden');
     if (calView)   calView.classList.add('hidden');
     if (genreView) genreView.classList.remove('hidden');
+    if (statsView) statsView.classList.add('hidden');
     renderGenreView();
+  } else if (state.view === 'stats') {
+    if (libView)   libView.classList.add('hidden');
+    if (libSub)    libSub.classList.add('hidden');
+    if (calView)   calView.classList.add('hidden');
+    if (genreView) genreView.classList.add('hidden');
+    if (statsView) statsView.classList.remove('hidden');
+    renderStatsView();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Personal Stats & Analytics Engine (Feature 3)
+// ---------------------------------------------------------------------------
+
+function renderStatsView() {
+  const container = document.getElementById('statsDashboardContainer');
+  if (!container) return;
+
+  const items = state.items;
+  if (!items || items.length === 0) {
+    container.innerHTML = `
+      <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-10 text-center space-y-3">
+        <div class="text-4xl">📊</div>
+        <h3 class="text-lg font-bold text-white">No Library Data to Analyze</h3>
+        <p class="text-xs text-slate-400">Add titles to your library or import your backup to view detailed analytics.</p>
+        <button data-action="switch-view" data-view="library" class="px-4 py-2 rounded-xl bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-xs transition">
+          Go to Library
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const totalTitles = items.length;
+
+  // Category counts
+  const catCounts = { 'Series & Anime': 0, 'Movies': 0, 'Games': 0, 'Books': 0 };
+  for (const item of items) {
+    if (catCounts[item.category] !== undefined) catCounts[item.category]++;
+    else catCounts['Series & Anime']++;
+  }
+
+  // Status counts
+  const statusCounts = { 'Completed': 0, 'Ongoing': 0, 'Planning': 0, 'On Hold': 0, 'Dropped': 0 };
+  for (const item of items) {
+    const st = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+    if (statusCounts[st] !== undefined) statusCounts[st]++;
+  }
+
+  const completedCount = statusCounts['Completed'];
+  const completionRate = totalTitles > 0 ? Math.round((completedCount / totalTitles) * 100) : 0;
+
+  // Time & Progress calculations
+  let totalEpisodesWatched = 0;
+  let totalMinutes = 0;
+  for (const item of items) {
+    const prog = Number(item.progress) || 0;
+    totalEpisodesWatched += prog;
+    if (item.category === 'Movies') {
+      const isDone = ((typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status) === 'Completed';
+      totalMinutes += isDone ? 115 : (prog * 115);
+    } else if (item.category === 'Games') {
+      totalMinutes += prog * 60;
+    } else if (item.category === 'Books') {
+      totalMinutes += prog * 15;
+    } else {
+      totalMinutes += prog * 23.5;
+    }
+  }
+
+  const totalHours = Math.round(totalMinutes / 60);
+  const totalDays = (totalMinutes / (60 * 24)).toFixed(1);
+
+  // Ratings calculation
+  const ratedItems = items.filter(i => Number(i.rating) > 0);
+  const avgRating = ratedItems.length > 0
+    ? (ratedItems.reduce((acc, i) => acc + Number(i.rating), 0) / ratedItems.length).toFixed(2)
+    : '0.00';
+  const masterpieces = items.filter(i => Number(i.rating) >= 9).length;
+  const favoritesCount = items.filter(i => Boolean(i.favorite)).length;
+
+  // Score distribution: 10 down to 1 + Unrated
+  const scoreDist = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(score => {
+    const count = items.filter(i => Math.round(Number(i.rating || 0)) === score).length;
+    return { score, count };
+  });
+  const unratedCount = items.filter(i => !i.rating || Number(i.rating) === 0).length;
+  const maxScoreCount = Math.max(1, ...scoreDist.map(s => s.count), unratedCount);
+
+  // Top 5 Studios
+  const studioStats = {};
+  for (const item of items) {
+    const studioRaw = (item.studio || '').trim();
+    if (!studioRaw || studioRaw.toLowerCase().includes('unknown') || studioRaw === 'Wikipedia') continue;
+    const studios = studioRaw.split(',').map(s => s.trim()).filter(Boolean);
+    for (const st of studios) {
+      if (!studioStats[st]) {
+        studioStats[st] = { name: st, count: 0, totalRating: 0, ratedCount: 0 };
+      }
+      studioStats[st].count++;
+      const r = Number(item.rating) || 0;
+      if (r > 0) {
+        studioStats[st].totalRating += r;
+        studioStats[st].ratedCount++;
+      }
+    }
+  }
+
+  const topStudios = Object.values(studioStats)
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      const avgA = a.ratedCount ? a.totalRating / a.ratedCount : 0;
+      const avgB = b.ratedCount ? b.totalRating / b.ratedCount : 0;
+      return avgB - avgA;
+    })
+    .slice(0, 5);
+
+  // Top Genres
+  const genreStats = {};
+  for (const item of items) {
+    if (Array.isArray(item.genres)) {
+      for (const g of item.genres) {
+        const cleanG = (g || '').trim();
+        if (!cleanG) continue;
+        genreStats[cleanG] = (genreStats[cleanG] || 0) + 1;
+      }
+    }
+  }
+
+  const topGenres = Object.entries(genreStats)
+    .map(([genre, count]) => ({ genre, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  // HTML Rendering
+  container.innerHTML = `
+    <!-- Top 4 KPI Metrics -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-md hover:border-[#ff9f1c]/50 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Media</span>
+          <span class="p-2 rounded-xl bg-amber-400/10 text-amber-400 text-lg">📺</span>
+        </div>
+        <div>
+          <div class="text-3xl font-extrabold text-white tracking-tight">${totalTitles}</div>
+          <div class="flex items-center gap-1.5 text-[11px] text-slate-300 mt-1 flex-wrap">
+            <span class="text-amber-300 font-semibold">${catCounts['Series & Anime']} Series</span>
+            <span>•</span>
+            <span>${catCounts['Movies']} Movies</span>
+            ${catCounts['Games'] > 0 ? `<span>•</span><span>${catCounts['Games']} Games</span>` : ''}
+            ${catCounts['Books'] > 0 ? `<span>•</span><span>${catCounts['Books']} Books</span>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-md hover:border-[#ff9f1c]/50 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Watch Time</span>
+          <span class="p-2 rounded-xl bg-sky-400/10 text-sky-400 text-lg">⏱️</span>
+        </div>
+        <div>
+          <div class="text-3xl font-extrabold text-white tracking-tight">${totalDays} <span class="text-base font-normal text-slate-400">days</span></div>
+          <div class="text-[11px] text-slate-300 mt-1">
+            <strong>${totalHours}</strong> hours • <strong>${totalEpisodesWatched}</strong> units consumed
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-md hover:border-[#ff9f1c]/50 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Mean Score</span>
+          <span class="p-2 rounded-xl bg-amber-400/10 text-amber-400 text-lg">★</span>
+        </div>
+        <div>
+          <div class="text-3xl font-extrabold text-amber-400 tracking-tight">${avgRating} <span class="text-base font-normal text-slate-400">/ 10</span></div>
+          <div class="text-[11px] text-slate-300 mt-1">
+            <strong>${masterpieces}</strong> Masterpieces (9★+) • <strong>${favoritesCount}</strong> Favorites
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-md hover:border-[#ff9f1c]/50 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Completion Rate</span>
+          <span class="p-2 rounded-xl bg-emerald-400/10 text-emerald-400 text-lg">🎯</span>
+        </div>
+        <div>
+          <div class="text-3xl font-extrabold text-emerald-400 tracking-tight">${completionRate}%</div>
+          <div class="text-[11px] text-slate-300 mt-1">
+            <strong>${completedCount}</strong> finished out of <strong>${totalTitles}</strong> titles
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Distribution Bar -->
+    <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-5 space-y-3 shadow-md">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-white flex items-center gap-2">
+          <span>📋</span> Library Status Distribution
+        </h3>
+        <span class="text-xs text-slate-400">${totalTitles} Total Entries</span>
+      </div>
+
+      <!-- Segmented Bar -->
+      <div class="w-full h-3 rounded-full bg-[#0d0e11] flex overflow-hidden p-0.5 gap-0.5 border border-[#3d494f]">
+        ${statusCounts['Completed'] > 0 ? `<div style="width:${(statusCounts['Completed'] / totalTitles) * 100}%" class="bg-emerald-500 rounded-sm" title="Completed: ${statusCounts['Completed']}"></div>` : ''}
+        ${statusCounts['Ongoing'] > 0 ? `<div style="width:${(statusCounts['Ongoing'] / totalTitles) * 100}%" class="bg-amber-500 rounded-sm" title="Ongoing: ${statusCounts['Ongoing']}"></div>` : ''}
+        ${statusCounts['Planning'] > 0 ? `<div style="width:${(statusCounts['Planning'] / totalTitles) * 100}%" class="bg-sky-500 rounded-sm" title="Planning: ${statusCounts['Planning']}"></div>` : ''}
+        ${statusCounts['On Hold'] > 0 ? `<div style="width:${(statusCounts['On Hold'] / totalTitles) * 100}%" class="bg-purple-500 rounded-sm" title="On Hold: ${statusCounts['On Hold']}"></div>` : ''}
+        ${statusCounts['Dropped'] > 0 ? `<div style="width:${(statusCounts['Dropped'] / totalTitles) * 100}%" class="bg-rose-500 rounded-sm" title="Dropped: ${statusCounts['Dropped']}"></div>` : ''}
+      </div>
+
+      <!-- Status Chips -->
+      <div class="flex items-center gap-3 text-xs flex-wrap pt-1">
+        <button data-action="stats-filter-status" data-status="Completed" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0d0e11] hover:bg-[#364146] text-slate-200 border border-emerald-500/30 transition">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>Completed:</span>
+          <span class="font-bold text-emerald-400">${statusCounts['Completed']}</span>
+        </button>
+        <button data-action="stats-filter-status" data-status="Ongoing" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0d0e11] hover:bg-[#364146] text-slate-200 border border-amber-500/30 transition">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span>Ongoing:</span>
+          <span class="font-bold text-amber-400">${statusCounts['Ongoing']}</span>
+        </button>
+        <button data-action="stats-filter-status" data-status="Planning" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0d0e11] hover:bg-[#364146] text-slate-200 border border-sky-500/30 transition">
+          <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+          <span>Planning:</span>
+          <span class="font-bold text-sky-400">${statusCounts['Planning']}</span>
+        </button>
+        <button data-action="stats-filter-status" data-status="On Hold" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0d0e11] hover:bg-[#364146] text-slate-200 border border-purple-500/30 transition">
+          <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+          <span>On Hold:</span>
+          <span class="font-bold text-purple-400">${statusCounts['On Hold']}</span>
+        </button>
+        <button data-action="stats-filter-status" data-status="Dropped" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0d0e11] hover:bg-[#364146] text-slate-200 border border-rose-500/30 transition">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+          <span>Dropped:</span>
+          <span class="font-bold text-rose-400">${statusCounts['Dropped']}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Rating Distribution & Top Studios / Genres Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <!-- Left: Interactive Rating Score Histogram (7 cols) -->
+      <div class="lg:col-span-7 bg-[#2c3539] border border-[#3d494f] rounded-2xl p-5 space-y-4 shadow-md">
+        <div class="flex items-center justify-between border-b border-[#3d494f] pb-3">
+          <div>
+            <h3 class="font-bold text-sm text-white flex items-center gap-2">
+              <span>⭐</span> Score Distribution
+            </h3>
+            <p class="text-[11px] text-slate-400">Frequency of user ratings across your library</p>
+          </div>
+          <span class="text-xs font-bold text-amber-400">${ratedItems.length} Rated</span>
+        </div>
+
+        <div class="space-y-2.5">
+          ${scoreDist.map(s => {
+            const pctOfMax = Math.round((s.count / maxScoreCount) * 100);
+            const isMasterpiece = s.score >= 9;
+            return `
+              <div
+                data-action="stats-filter-score"
+                data-score="${s.score}"
+                class="group flex items-center gap-3 p-1 rounded-lg hover:bg-[#0d0e11]/60 cursor-pointer transition"
+                title="Filter library by score ${s.score}"
+              >
+                <div class="w-12 text-right shrink-0">
+                  <span class="inline-flex items-center gap-1 text-xs font-bold ${isMasterpiece ? 'text-amber-400 font-extrabold' : 'text-slate-300'}">
+                    <span>${s.score}</span>
+                    <span class="text-[10px]">★</span>
+                  </span>
+                </div>
+                <div class="flex-1 h-4 rounded-md bg-[#0d0e11] overflow-hidden p-0.5">
+                  <div
+                    class="h-full rounded transition-all duration-500 ${isMasterpiece ? 'bg-[#ff9f1c]' : 'bg-[#ff9f1c]/70 group-hover:bg-[#ff9f1c]'}"
+                    style="width: ${pctOfMax}%"
+                  ></div>
+                </div>
+                <div class="w-12 text-right shrink-0 text-xs font-mono font-bold text-slate-300 group-hover:text-amber-300">
+                  ${s.count}
+                </div>
+              </div>
+            `;
+          }).join('')}
+
+          ${unratedCount > 0 ? `
+            <div
+              data-action="stats-filter-score"
+              data-score="0"
+              class="group flex items-center gap-3 p-1 rounded-lg hover:bg-[#0d0e11]/60 cursor-pointer transition"
+              title="Filter unrated titles"
+            >
+              <div class="w-12 text-right shrink-0 text-xs font-bold text-slate-400">
+                Unrated
+              </div>
+              <div class="flex-1 h-4 rounded-md bg-[#0d0e11] overflow-hidden p-0.5">
+                <div
+                  class="h-full rounded bg-slate-600 group-hover:bg-slate-500 transition-all duration-500"
+                  style="width: ${Math.round((unratedCount / maxScoreCount) * 100)}%"
+                ></div>
+              </div>
+              <div class="w-12 text-right shrink-0 text-xs font-mono font-bold text-slate-400 group-hover:text-white">
+                ${unratedCount}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Right: Top Studios & Top Genres (5 cols) -->
+      <div class="lg:col-span-5 space-y-5">
+        <!-- Top Studios -->
+        <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-5 space-y-4 shadow-md">
+          <div class="flex items-center justify-between border-b border-[#3d494f] pb-3">
+            <div>
+              <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                <span>🏆</span> Top Studios &amp; Creators
+              </h3>
+              <p class="text-[11px] text-slate-400">Most frequent creators in your library</p>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            ${topStudios.length === 0 ? `
+              <div class="text-xs text-slate-500 py-3 text-center">No studio data available. Use AniList Enricher to auto-populate studios!</div>
+            ` : topStudios.map((st, idx) => {
+              const medals = ['🥇', '🥈', '🥉', '#4', '#5'];
+              const avgScore = st.ratedCount > 0 ? (st.totalRating / st.ratedCount).toFixed(1) : null;
+              return `
+                <div
+                  data-action="stats-filter-studio"
+                  data-studio="${esc(st.name)}"
+                  class="flex items-center justify-between p-2.5 rounded-xl bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c]/50 cursor-pointer transition"
+                  title="Filter library by ${esc(st.name)}"
+                >
+                  <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <span class="text-sm font-bold text-amber-400 shrink-0 w-6 text-center">${medals[idx] || '#' + (idx + 1)}</span>
+                    <span class="text-xs font-bold text-white truncate">${esc(st.name)}</span>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-[#2c3539] text-slate-300">${st.count} titles</span>
+                    ${avgScore ? `
+                      <span class="text-[11px] font-bold text-amber-400 flex items-center gap-0.5">
+                        <span>★</span>
+                        <span>${avgScore}</span>
+                      </span>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Top Genres -->
+        <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl p-5 space-y-4 shadow-md">
+          <div class="flex items-center justify-between border-b border-[#3d494f] pb-3">
+            <div>
+              <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                <span>🏷️</span> Top Genres
+              </h3>
+              <p class="text-[11px] text-slate-400">Click to explore genres</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            ${topGenres.map(g => `
+              <button
+                type="button"
+                data-action="stats-open-genre"
+                data-genre="${esc(g.genre)}"
+                class="px-3 py-1.5 rounded-xl bg-[#0d0e11] hover:bg-[#ff9f1c] hover:text-[#0d0e11] text-slate-200 border border-[#3d494f] hover:border-[#ff9f1c] text-xs font-bold flex items-center gap-2 transition shadow-sm group"
+              >
+                <span>${esc(g.genre)}</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded bg-[#2c3539] group-hover:bg-[#0d0e11]/20 font-mono text-amber-400 group-hover:text-[#0d0e11]">${g.count}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 // ---------------------------------------------------------------------------
@@ -2345,6 +2744,38 @@ document.addEventListener('click', async (e) => {
     const searchInput = document.getElementById('librarySearchInput');
     if (searchInput) searchInput.value = tag;
     renderLibrary();
+  } else if (action === 'stats-filter-status') {
+    state.status = btn.dataset.status;
+    state.view = 'library';
+    renderAll();
+  } else if (action === 'stats-filter-score') {
+    const score = parseInt(btn.dataset.score, 10);
+    state.view = 'library';
+    state.status = 'All';
+    if (score === 0) {
+      state.items.sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
+    } else {
+      state.sortKey = 'rating';
+      state.sortDir = 'desc';
+    }
+    renderAll();
+    showToast(score === 0 ? 'Viewing unrated titles in Library' : `Viewing ${score}★ rated titles in Library`);
+  } else if (action === 'stats-filter-studio') {
+    const studio = btn.dataset.studio;
+    state.view = 'library';
+    state.search = studio;
+    const lInp = document.getElementById('librarySearchInput');
+    if (lInp) lInp.value = studio;
+    renderAll();
+    showToast(`Filtered library by studio "${studio}"`);
+  } else if (action === 'stats-open-genre') {
+    const genre = btn.dataset.genre;
+    state.view = 'genre';
+    renderAll();
+    setTimeout(() => {
+      const section = Array.from(document.querySelectorAll('#genreGrid h3')).find(h => h.textContent.trim().toLowerCase() === genre.toLowerCase());
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   } else if (action === 'edit-item') {
     e.stopPropagation();
     const item = state.items.find((i) => i.id === btn.dataset.id);
@@ -3422,6 +3853,10 @@ document.addEventListener('keydown', (e) => {
     renderAll();
   } else if (e.key === '3') {
     state.view = 'genre';
+    document.getElementById('tomeDropdown')?.classList.add('hidden');
+    renderAll();
+  } else if (e.key === '4') {
+    state.view = 'stats';
     document.getElementById('tomeDropdown')?.classList.add('hidden');
     renderAll();
   } else if (e.key === 'l' || e.key === 'L') {
