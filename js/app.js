@@ -1125,17 +1125,21 @@ function renderCalendar() {
     }
   }
 
-  // Monthly summary stats (C1)
+  // Monthly summary stats (C1 & Feature 4)
   const currentMonthPrefix = `${state.calYear}-${state.calMonth}-`;
   let monthEventCount = 0;
+  const monthItemsSet = new Set();
   for (const [key, evList] of eventsByKey.entries()) {
-    if (key.startsWith(currentMonthPrefix)) monthEventCount += evList.length;
+    if (key.startsWith(currentMonthPrefix)) {
+      monthEventCount += evList.length;
+      for (const ev of evList) monthItemsSet.add(ev.item.id);
+    }
   }
   const summaryEl = document.getElementById('calendarMonthSummary');
   if (summaryEl) {
     summaryEl.textContent = monthEventCount > 0
-      ? `${monthEventCount} ${monthEventCount === 1 ? 'item' : 'items'} in ${monthNames[state.calMonth]}`
-      : `No items in ${monthNames[state.calMonth]}`;
+      ? `${monthItemsSet.size} ${monthItemsSet.size === 1 ? 'title' : 'titles'} logged (${monthEventCount} milestones) in ${monthNames[state.calMonth]}`
+      : `No logged milestones in ${monthNames[state.calMonth]}`;
   }
 
   const jumpBar = document.getElementById('calendarJumpBar');
@@ -1152,13 +1156,97 @@ function renderCalendar() {
             data-month="${m}"
             class="px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
               active
-                ? 'bg-[#ff9f1c] text-[#0d0e11]'
+                ? 'bg-[#ff9f1c] text-[#0d0e11] font-bold shadow'
                 : 'bg-[#2c3539] text-slate-300 hover:text-white border border-[#3d494f]'
             }"
           >${esc(label)}</button>`;
         }).join('');
     } else {
       jumpBar.innerHTML = `<span class="text-xs text-slate-400">Add dates or ranges to your library entries to visualize them here on the calendar.</span>`;
+    }
+  }
+
+  // Quick Missing Dates Logger Tray (Feature 4)
+  const quickTray = document.getElementById('calendarQuickDateTray');
+  if (quickTray) {
+    const isOwner = OwnerMode.isOwner();
+    const undatedCompleted = state.items.filter((i) => {
+      const st = (typeof normalizeStatus === 'function') ? normalizeStatus(i.status) : i.status;
+      return st === 'Completed' && (!i.consumedDate || !i.consumedDate.trim());
+    });
+
+    if (undatedCompleted.length > 0 && isOwner) {
+      quickTray.classList.remove('hidden');
+      const isExpanded = Boolean(state.showUndatedTray);
+      quickTray.innerHTML = `
+        <div class="bg-[#2c3539] border border-amber-500/30 rounded-xl p-3 sm:p-4 space-y-3 shadow-md">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">📌</span>
+              <div>
+                <div class="text-xs font-bold text-white">
+                  <span class="text-amber-400 font-extrabold">${undatedCompleted.length}</span> completed ${undatedCompleted.length === 1 ? 'title is' : 'titles are'} missing calendar dates
+                </div>
+                <p class="text-[11px] text-slate-400">Log finish dates so they appear on your monthly calendar timeline</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                data-action="toggle-undated-tray"
+                class="px-3 py-1.5 rounded-lg bg-[#0d0e11] hover:bg-[#364146] text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <span>${isExpanded ? '▲ Hide Undated Titles' : '▼ Quick Assign Dates'}</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-mono">${undatedCompleted.length}</span>
+              </button>
+            </div>
+          </div>
+
+          ${isExpanded ? `
+            <div class="border-t border-[#3d494f] pt-3 max-h-60 overflow-y-auto space-y-2 no-scrollbar">
+              ${undatedCompleted.slice(0, 15).map(item => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] gap-2">
+                  <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <img src="${esc(item.image || makeFallbackPoster(item.title))}" class="w-7 h-10 object-cover rounded bg-[#2c3539] shrink-0" />
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-bold text-white truncate">${esc(getItemTitle(item))}</div>
+                      <div class="text-[10px] text-slate-400 truncate">${esc(item.category)} • ${esc(item.studio || 'Studio')}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      data-action="set-item-finished-today"
+                      data-id="${esc(item.id)}"
+                      class="px-2.5 py-1 rounded bg-amber-400 hover:bg-amber-300 text-[#0d0e11] text-[11px] font-bold transition shadow-sm"
+                      title="Set finish date to today"
+                    >
+                      ⚡ Finished Today
+                    </button>
+                    <button
+                      type="button"
+                      data-action="edit-item"
+                      data-id="${esc(item.id)}"
+                      class="px-2 py-1 rounded bg-[#2c3539] hover:bg-[#364146] text-slate-200 text-[11px] font-medium border border-[#3d494f] transition"
+                      title="Pick specific date"
+                    >
+                      ✎ Pick Date
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+              ${undatedCompleted.length > 15 ? `
+                <div class="text-[11px] text-slate-400 text-center py-1">
+                  ...and ${undatedCompleted.length - 15} more undated completed titles
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    } else {
+      quickTray.classList.add('hidden');
+      quickTray.innerHTML = '';
     }
   }
 
@@ -1197,9 +1285,9 @@ function renderCalendar() {
     const dateStr   = `${d}-${state.calMonth + 1}-${state.calYear}`;
 
     cells.push(`
-      <div class="min-h-[115px] rounded-xl bg-[#2c3539] border ${isToday ? 'border-[#ff9f1c]' : 'border-[#3d494f]'} p-2 flex flex-col justify-between">
+      <div class="min-h-[115px] rounded-xl bg-[#2c3539] border ${isToday ? 'border-2 border-amber-400 shadow-[0_0_15px_rgba(255,159,28,0.25)] ring-1 ring-amber-400/40' : 'border-[#3d494f]'} p-2 flex flex-col justify-between">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold ${isToday ? 'px-1.5 py-0.5 rounded bg-[#ff9f1c] text-[#0d0e11]' : 'text-slate-300'}">${d}</span>
+          <span class="text-xs font-bold ${isToday ? 'px-2 py-0.5 rounded bg-amber-400 text-[#0d0e11] font-extrabold shadow' : 'text-slate-300'}">${d}</span>
           ${isOwner ? `
             <button
               data-action="add-on-date"
@@ -2776,6 +2864,23 @@ document.addEventListener('click', async (e) => {
       const section = Array.from(document.querySelectorAll('#genreGrid h3')).find(h => h.textContent.trim().toLowerCase() === genre.toLowerCase());
       if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
+  } else if (action === 'toggle-undated-tray') {
+    state.showUndatedTray = !state.showUndatedTray;
+    renderCalendar();
+  } else if (action === 'set-item-finished-today') {
+    const id = btn.dataset.id;
+    const item = state.items.find(i => i.id === id);
+    if (item) {
+      const now = new Date();
+      const dd = String(now.getDate());
+      const mm = String(now.getMonth() + 1);
+      const yyyy = String(now.getFullYear());
+      item.consumedDate = `${dd}-${mm}-${yyyy}`;
+      item.updatedAt = Date.now();
+      saveItems();
+      renderAll();
+      showToast(`Logged "${item.title}" finished today (${item.consumedDate}) 📅`);
+    }
   } else if (action === 'edit-item') {
     e.stopPropagation();
     const item = state.items.find((i) => i.id === btn.dataset.id);
