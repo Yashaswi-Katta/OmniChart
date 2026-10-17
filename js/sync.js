@@ -12,7 +12,7 @@ const STORAGE_KEY = 'omnichart_v4_items';
 // ---------------------------------------------------------------------------
 const OMNICHART_CONFIG = {
   // Provider: 'localStorage' (default) | 'supabase' | 'firebase'
-  cloudProvider: 'localStorage',
+  cloudProvider: 'supabase',
 
   // Owner Mode Protection:
   // Set to true if deploying to GitHub Pages or a public portfolio.
@@ -27,8 +27,8 @@ const OMNICHART_CONFIG = {
   // 2. Set cloudProvider: 'supabase'
   // 3. Fill url and anonKey below
   supabase: {
-    url: '', // e.g. 'https://your-project.supabase.co'
-    anonKey: '', // your public anon key
+    url: 'https://vfwjyulubcmbiuizkwhd.supabase.co',
+    anonKey: 'sb_publishable_E_MNyYoiqFaQ6fbLWGQoUA_o4Gxzlr7',
     tableName: 'omnichart_items'
   },
 
