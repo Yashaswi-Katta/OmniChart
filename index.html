@@ -155,14 +155,6 @@
               <span class="flex items-center gap-2"><span>📂</span> Import JSON File</span>
               <input id="importFileInput" type="file" accept=".json,application/json" class="hidden" />
             </label>
-            <!-- Restore Master 397 Library -->
-            <button
-              data-action="restore-seed-library"
-              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 transition"
-              title="Load perfected 397 anime titles library"
-            >
-              <span class="flex items-center gap-2"><span>✨</span> Restore 397 Master Library</span>
-            </button>
           </div>
         </div>
       </div>
@@ -1267,11 +1259,10 @@
     </button>
   </nav>
 
-  <!-- Modular JavaScript (load order matters: seed-data → sync → api → app) -->
-  <script src="js/seed-data.js?v=6"></script>
-  <script src="js/sync.js?v=6"></script>
-  <script src="js/api.js?v=6"></script>
-  <script src="js/app.js?v=6"></script>
+  <!-- Modular JavaScript (load order matters: sync → api → app) -->
+  <script src="js/sync.js?v=7"></script>
+  <script src="js/api.js?v=7"></script>
+  <script src="js/app.js?v=7"></script>
 
 </body>
 </html>

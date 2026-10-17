@@ -493,60 +493,15 @@ function loadItems() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         state.items = parsed;
-
-        // Auto-heal missing metadata on existing items from seed library
-        if (Array.isArray(window.OMNICHART_SEED_DATA) && window.OMNICHART_SEED_DATA.length > 0) {
-          const seedMap = new Map();
-          for (const s of window.OMNICHART_SEED_DATA) {
-            if (s.id) seedMap.set(s.id, s);
-            if (s.title) seedMap.set(s.title.toLowerCase(), s);
-            if (s.titleEnglish) seedMap.set(s.titleEnglish.toLowerCase(), s);
-            if (s.titleRomaji) seedMap.set(s.titleRomaji.toLowerCase(), s);
-          }
-          let healed = false;
-          for (const item of state.items) {
-            const seed = seedMap.get(item.id) || seedMap.get((item.title || '').toLowerCase());
-            if (seed) {
-              if ((!item.titleEnglish || item.titleEnglish === item.title) && seed.titleEnglish) { item.titleEnglish = seed.titleEnglish; healed = true; }
-              if ((!item.titleRomaji || item.titleRomaji === item.title) && seed.titleRomaji) { item.titleRomaji = seed.titleRomaji; healed = true; }
-              if ((!item.studio || item.studio === 'Unknown Studio') && seed.studio) { item.studio = seed.studio; healed = true; }
-              if ((!item.releaseDate || item.releaseDate === 'TBA') && seed.releaseDate) { item.releaseDate = seed.releaseDate; healed = true; }
-              if ((!item.genres || item.genres.length === 0) && seed.genres) { item.genres = [...seed.genres]; healed = true; }
-              if ((!item.synopsis || !item.synopsis.trim()) && seed.synopsis) { item.synopsis = seed.synopsis; healed = true; }
-              if ((!item.image || item.image.includes('u.livechart.me')) && seed.image) { item.image = seed.image; healed = true; }
-            }
-          }
-          if (healed) saveItems(false);
-        }
-
         if (sanitizeAndRecoverItems(state.items)) {
           saveItems(false);
-        }
-
-        // If cloud sync provider is active, pull cloud data and merge
-        if (OMNICHART_CONFIG.cloudProvider !== 'localStorage') {
-          CloudSync.pull().then((cloudItems) => {
-            if (cloudItems && cloudItems.length > 0) {
-              state.items = mergeLibraries(state.items, cloudItems);
-              saveItems(false);
-              if (typeof renderAll === 'function') renderAll();
-            }
-          });
         }
         return;
       }
     }
   } catch (e) {}
 
-  // If local storage is empty, initialize with the 397 perfected seed library!
-  if (Array.isArray(window.OMNICHART_SEED_DATA) && window.OMNICHART_SEED_DATA.length > 0) {
-    state.items = JSON.parse(JSON.stringify(window.OMNICHART_SEED_DATA));
-    saveItems(false);
-    return;
-  }
-
   state.items = [];
-  saveItems(false);
 }
 
 function saveItems(shouldPushCloud = true) {
@@ -716,16 +671,16 @@ const CloudSync = {
         state.user = session.user;
         state.cloudStatus = 'connected';
         const remoteItems = await this.pull();
-        if (Array.isArray(remoteItems) && remoteItems.length > 0) {
-          state.items = remoteItems;
-          saveItems(false);
-        } else if (state.items.length > 0) {
-          await this.push(state.items);
-        }
+        state.items = Array.isArray(remoteItems) ? remoteItems : [];
+        saveItems(false);
         this.subscribe();
       } else {
         state.user = null;
         state.cloudStatus = 'offline';
+        if (event === 'SIGNED_OUT') {
+          state.items = [];
+          saveItems(false);
+        }
         if (this._realtimeChannel) {
           client.removeChannel(this._realtimeChannel);
           this._realtimeChannel = null;
@@ -1098,6 +1053,22 @@ const CloudSync = {
     }
   },
 
+  /** Clear all items for the authenticated user from the cloud */
+  async clearUserLibrary() {
+    if (!state.user) return;
+    const client = this.getClient();
+    if (!client) return;
+    try {
+      this._lastLocalPushTime = Date.now();
+      await client
+        .from(OMNICHART_CONFIG.supabase.tableName)
+        .delete()
+        .eq('user_id', state.user.id);
+    } catch (err) {
+      console.warn('[CloudSync] Clear user library exception:', err);
+    }
+  },
+
   /** Pull all items for the authenticated user - S3 Last-Write-Wins */
   async pull() {
     if (!state.user) return null;
@@ -1122,6 +1093,8 @@ const CloudSync = {
         return data.map((row) => ({
           id: row.id,
           title: row.title,
+          titleEnglish: row.title_english || row.titleEnglish || '',
+          titleRomaji: row.title_romaji || row.titleRomaji || '',
           category: row.category,
           status: (typeof normalizeStatus === 'function') ? normalizeStatus(row.status) : row.status,
           rating: Number(row.rating || 0),
