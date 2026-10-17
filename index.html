@@ -29,111 +29,99 @@
       
       <!-- Left: Black Tome Menu Trigger + Brand -->
       <div class="relative flex items-center gap-2.5">
-        <button
-          id="tomeMenuBtn"
-          data-action="toggle-tome-menu"
-          title="Open Navigation Menu"
-          class="group flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] transition"
-        >
-          <svg class="w-6 h-6 shrink-0" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="3" width="20" height="22" rx="2.5" fill="#0d0e11" stroke="#ff9f1c" stroke-width="1.8"/>
-            <path d="M8 3V25" stroke="#ff9f1c" stroke-width="1.4"/>
-            <rect x="11" y="7" width="9" height="1.8" rx="0.9" fill="#f8fafc"/>
-            <rect x="11" y="11" width="6" height="1.5" rx="0.75" fill="#94a3b8"/>
-            <path d="M21 22H8C6.89543 22 6 22.8954 6 24" stroke="#f8fafc" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
-          <span class="font-bold tracking-tight text-white text-base">OmniChart</span>
-          <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-[#ff9f1c] transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-          </svg>
-        </button>
+        <!-- Brand Header with Tagline -->
+        <div class="flex items-center gap-2.5">
+          <button
+            id="tomeMenuBtn"
+            data-action="toggle-tome-menu"
+            title="Open OmniChart Menu"
+            class="group flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-[#2c3539] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] transition"
+          >
+            <svg class="w-6 h-6 shrink-0" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="3" width="20" height="22" rx="2.5" fill="#0d0e11" stroke="#ff9f1c" stroke-width="1.8"/>
+              <path d="M8 3V25" stroke="#ff9f1c" stroke-width="1.4"/>
+              <rect x="11" y="7" width="9" height="1.8" rx="0.9" fill="#f8fafc"/>
+              <rect x="11" y="11" width="6" height="1.5" rx="0.75" fill="#94a3b8"/>
+              <path d="M21 22H8C6.89543 22 6 22.8954 6 24" stroke="#f8fafc" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            <div class="text-left">
+              <div class="font-bold tracking-tight text-white text-sm leading-none">OmniChart</div>
+              <div class="text-[9px] text-slate-400 hidden lg:block leading-none mt-1">Track shows, anime, movies, games &amp; books</div>
+            </div>
+            <svg class="w-3 h-3 text-slate-400 group-hover:text-[#ff9f1c] transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
 
-        <!-- TOME POPUP MENU -->
-        <div
-          id="tomeDropdown"
-          class="hidden absolute left-0 top-12 w-60 rounded-xl bg-[#2c3539] border border-[#3d494f] shadow-2xl p-1.5 z-50"
-        >
-          <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-[#3d494f]/70 mb-1">
-            Switch View
+          <!-- Desktop Primary Navigation Tabs (N1) -->
+          <nav id="desktopNav" class="hidden md:flex items-center gap-1 ml-1 bg-[#2c3539]/60 p-1 rounded-xl border border-[#3d494f]/60">
+            <button
+              data-action="switch-view"
+              data-view="library"
+              id="topNavLibrary"
+              class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-[#2c3539] text-[#ff9f1c] border border-[#3d494f] shadow-sm"
+            >
+              <span>Library</span>
+              <span id="navLibraryCount" class="text-[10px] px-1.5 py-0.2 rounded bg-[#0d0e11] text-slate-300">0</span>
+            </button>
+            <button
+              data-action="switch-view"
+              data-view="calendar"
+              id="topNavCalendar"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#364146] transition flex items-center gap-1.5"
+            >
+              <span>Calendar</span>
+              <span id="navCalendarCount" class="text-[10px] px-1.5 py-0.2 rounded bg-[#0d0e11] text-[#ff9f1c]">0</span>
+            </button>
+            <button
+              data-action="switch-view"
+              data-view="genre"
+              id="topNavGenre"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#364146] transition flex items-center gap-1.5"
+            >
+              <span>Genres</span>
+              <span id="navGenreCount" class="text-[10px] px-1.5 py-0.2 rounded bg-[#0d0e11] text-[#ff9f1c]">0</span>
+            </button>
+          </nav>
+
+          <!-- TOME POPUP MENU (Brand & Tools) -->
+          <div
+            id="tomeDropdown"
+            class="hidden absolute left-0 top-12 w-64 rounded-xl bg-[#2c3539] border border-[#3d494f] shadow-2xl p-1.5 z-50"
+          >
+            <div class="px-3 py-2 text-xs border-b border-[#3d494f]/70 mb-1">
+              <div class="font-bold text-white">OmniChart Tracker</div>
+              <div class="text-[10px] text-slate-400">All-in-one entertainment tracker</div>
+            </div>
+            <button
+              data-action="open-auth-modal"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-sky-300 hover:bg-sky-500/15 transition"
+            >
+              <span class="flex items-center gap-2">
+                <span>☁️</span> Cloud Sync
+              </span>
+              <span id="menuCloudBadge" class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold">Local</span>
+            </button>
+            <button
+              data-action="enrich-library"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-[#ff9f1c] hover:bg-[#ff9f1c]/15 transition mt-0.5"
+            >
+              <span class="flex items-center gap-2"><span>⚡</span> Fetch Details</span>
+            </button>
+            <button
+              data-action="toggle-bulk-mode"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-rose-300 hover:bg-rose-500/15 transition mt-0.5"
+            >
+              <span class="flex items-center gap-2"><span>🗑️</span> Bulk Delete</span>
+            </button>
+            <div class="border-t border-[#3d494f]/70 my-1"></div>
+            <button
+              data-action="export-json"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#364146] transition"
+            >
+              <span class="flex items-center gap-2"><span>💾</span> Export Backup JSON</span>
+            </button>
           </div>
-          <button
-            data-action="switch-view"
-            data-view="library"
-            id="menuViewLibrary"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition"
-          >
-            <span class="flex items-center gap-2.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-              </svg>
-              Library
-            </span>
-            <span id="menuLibraryCount" class="text-xs px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-300">0</span>
-          </button>
-
-          <button
-            data-action="switch-view"
-            data-view="calendar"
-            id="menuViewCalendar"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition mt-0.5"
-          >
-            <span class="flex items-center gap-2.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
-              Calendar
-            </span>
-            <span id="menuCalendarCount" class="text-xs px-1.5 py-0.5 rounded bg-[#0d0e11] text-[#ff9f1c]">0</span>
-          </button>
-
-          <button
-            data-action="switch-view"
-            data-view="genre"
-            id="menuViewGenre"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition mt-0.5 text-slate-200 hover:bg-[#364146]"
-          >
-            <span class="flex items-center gap-2.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-              </svg>
-              Genres
-            </span>
-            <span id="menuGenreCount" class="text-xs px-1.5 py-0.5 rounded bg-[#0d0e11] text-[#ff9f1c]">0</span>
-          </button>
-
-          <div class="border-t border-[#3d494f]/70 my-1.5"></div>
-          <button
-            data-action="enrich-library"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-[#ff9f1c] hover:bg-[#ff9f1c]/15 transition"
-          >
-            <span class="flex items-center gap-2.5">⚡ Enrich Metadata</span>
-            <span class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-[#ff9f1c]">Auto</span>
-          </button>
-          <button
-            data-action="toggle-bulk-mode"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-rose-300 hover:bg-rose-500/15 transition mt-0.5"
-          >
-            <span class="flex items-center gap-2.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-              </svg>
-              Mass Removal
-            </span>
-            <span class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">Bulk</span>
-          </button>
-          <div class="border-t border-[#3d494f]/70 my-1.5"></div>
-          <button
-            data-action="open-auth-modal"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-sky-300 hover:bg-sky-500/15 transition mt-0.5"
-          >
-            <span class="flex items-center gap-2.5">
-              <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
-              </svg>
-              Cloud Sync
-            </span>
-            <span id="menuCloudBadge" class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold">Guest</span>
-          </button>
         </div>
       </div>
 
@@ -198,49 +186,71 @@
           <option value="progress-desc">Sort: Progress</option>
         </select>
 
-        <button
-          id="enrichBtn"
-          data-action="enrich-library"
-          title="Auto-fill missing Studio, Release Date, Genres, and Synopsis for all library entries"
-          class="h-8 px-2.5 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#ff9f1c]/50 text-xs text-[#ff9f1c] font-semibold flex items-center gap-1.5 transition"
-        >
-          <span>⚡</span>
-          <span class="hidden sm:inline">Enrich Metadata</span>
-        </button>
+        <!-- More Actions Dropdown (B1) -->
+        <div class="relative">
+          <button
+            id="moreActionsBtn"
+            data-action="toggle-more-actions"
+            title="More Actions"
+            class="h-8 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#3d494f] text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition"
+          >
+            <span>•••</span>
+            <span class="hidden sm:inline">Actions</span>
+          </button>
+          <div
+            id="moreActionsMenu"
+            class="hidden absolute right-0 top-10 w-64 rounded-xl bg-[#2c3539] border border-[#3d494f] shadow-2xl p-1.5 z-40 space-y-1"
+          >
+            <button
+              data-action="enrich-library"
+              class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[#ff9f1c] hover:bg-[#ff9f1c]/15 transition text-left"
+            >
+              <span>⚡</span>
+              <span>Fetch details (poster, genres, synopsis)</span>
+            </button>
+            <button
+              data-action="toggle-bulk-mode"
+              class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-rose-300 hover:bg-rose-500/15 transition text-left"
+            >
+              <span>🗑️</span>
+              <span>Bulk delete</span>
+            </button>
+            <div class="border-t border-[#3d494f]/70 my-1"></div>
+            <button
+              data-action="export-json"
+              class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#364146] transition text-left"
+            >
+              <span>💾</span>
+              <span>Export backup JSON</span>
+            </button>
+            <label
+              class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#364146] cursor-pointer transition text-left"
+            >
+              <span>📂</span>
+              <span>Import backup JSON</span>
+              <input id="importFileInput" type="file" accept=".json,application/json" class="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-        <button
-          id="bulkModeBtn"
-          data-action="toggle-bulk-mode"
-          title="Mass Removal Mode"
-          class="h-8 px-2.5 rounded-lg bg-[#0d0e11] hover:bg-rose-950/60 border border-[#3d494f] hover:border-rose-500/60 text-xs text-slate-200 hover:text-rose-200 flex items-center gap-1.5 transition"
-        >
-          <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-          </svg>
-          <span class="hidden sm:inline">Mass Remove</span>
+  <!-- GUEST STORAGE WARNING & BACKUP REMINDER BANNER (D1) -->
+  <section id="guestStorageBanner" class="hidden bg-[#0d0e11] border-b border-amber-500/30 px-4 py-2 text-xs">
+    <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2 text-slate-300">
+      <div class="flex items-center gap-2">
+        <span class="text-amber-400">⚠️</span>
+        <span><strong>Local only:</strong> Your data lives only on this device. Back up regularly or sign in to sync across devices.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button data-action="export-json" class="px-2.5 py-1 rounded bg-[#2c3539] hover:bg-[#364146] text-[#ff9f1c] border border-[#3d494f] text-[11px] font-semibold transition">
+          💾 Download Backup
         </button>
-
-        <button
-          data-action="export-json"
-          title="Export Library JSON"
-          class="h-8 px-2.5 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#3d494f] text-xs text-slate-200 flex items-center gap-1 transition"
-        >
-          <svg class="w-3.5 h-3.5 text-[#ff9f1c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/>
-          </svg>
-          <span class="hidden md:inline">Export</span>
+        <button data-action="open-auth-modal" class="px-2.5 py-1 rounded bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] text-[11px] font-bold transition">
+          ☁️ Sign In to Sync
         </button>
-
-        <label
-          title="Import Library JSON"
-          class="h-8 px-2.5 rounded-lg bg-[#0d0e11] hover:bg-[#2c3539] border border-[#3d494f] text-xs text-slate-200 flex items-center gap-1 cursor-pointer transition"
-        >
-          <svg class="w-3.5 h-3.5 text-[#ff9f1c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4m0 0L8 8m4-4v12"/>
-          </svg>
-          <span class="hidden md:inline">Import</span>
-          <input id="importFileInput" type="file" accept=".json,application/json" class="hidden" />
-        </label>
+        <button data-action="dismiss-guest-banner" class="text-slate-400 hover:text-white px-1 font-bold text-sm" title="Dismiss for now">✕</button>
       </div>
     </div>
   </section>
@@ -266,12 +276,12 @@
     </div>
   </section>
 
-  <!-- MASS REMOVAL TOOLBAR -->
+  <!-- BULK DELETE TOOLBAR (W2) -->
   <section id="bulkToolbar" class="hidden bg-rose-950/30 border-b border-rose-500/40">
     <div class="max-w-[1600px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs font-bold uppercase tracking-wider px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-          Mass Removal Mode
+          Bulk Delete Mode
         </span>
         <span id="bulkSelectedCount" class="text-xs text-slate-200 font-medium">0 selected</span>
         <div class="h-4 w-px bg-[#3d494f] mx-1"></div>
@@ -324,7 +334,7 @@
   </section>
 
   <!-- MAIN CONTENT -->
-  <main class="max-w-[1600px] mx-auto px-4 py-5">
+  <main class="max-w-[1600px] mx-auto px-4 py-5 pb-20 md:pb-8">
     
     <!-- LIBRARY VIEW -->
     <div id="libraryView">
@@ -339,7 +349,10 @@
             data-action="cal-prev-month"
             class="h-9 w-9 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] flex items-center justify-center text-slate-200"
           >‹</button>
-          <h2 id="calendarMonthLabel" class="text-lg font-bold text-white min-w-[160px] text-center"></h2>
+          <div class="text-center min-w-[160px]">
+            <h2 id="calendarMonthLabel" class="text-lg font-bold text-white leading-tight"></h2>
+            <div id="calendarMonthSummary" class="text-[11px] text-slate-400"></div>
+          </div>
           <button
             data-action="cal-next-month"
             class="h-9 w-9 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] flex items-center justify-center text-slate-200"
@@ -350,15 +363,16 @@
           >Today</button>
         </div>
 
+        <!-- Clean Calendar Legend (C2) -->
         <div class="flex items-center gap-3 text-xs text-slate-300">
           <span class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-[#ff9f1c]"></span> Single Date (DAY)
+            <span class="w-2.5 h-2.5 rounded-full bg-[#ff9f1c]"></span> Single day
           </span>
           <span class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Range Start (START)
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Range start
           </span>
           <span class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Range End (END)
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Range end
           </span>
         </div>
       </div>
@@ -531,15 +545,29 @@
             </div>
             <input id="fieldReleaseDate" type="text" placeholder="e.g. Fall 2023" class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
           </div>
+          <!-- Native Date / Range Picker (F4) -->
           <div>
             <div class="h-6 flex items-center justify-between mb-1">
-              <label class="text-xs text-[#ff9f1c] font-semibold">Date / Range</label>
-              <div class="flex items-center gap-1">
+              <label class="text-xs text-[#ff9f1c] font-semibold">Calendar Date</label>
+              <div class="flex items-center gap-1.5">
                 <button type="button" data-action="fill-today-date" class="text-[10px] px-1.5 py-0.5 rounded bg-[#0d0e11] border border-[#3d494f] text-slate-300 hover:text-white transition">Today</button>
-                <button type="button" data-action="append-date-to" class="text-[10px] px-1.5 py-0.5 rounded bg-[#0d0e11] border border-[#3d494f] text-slate-300 hover:text-white transition">+ to</button>
+                <label class="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer select-none">
+                  <input type="checkbox" id="fieldRangeToggle" class="w-3.5 h-3.5 accent-[#ff9f1c] rounded" />
+                  <span>Add end date</span>
+                </label>
               </div>
             </div>
-            <input id="fieldConsumedDate" type="text" placeholder="DD-MM-YYYY or DD-MM-YYYY to DD-MM-YYYY" class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white focus:outline-none focus:border-[#ff9f1c]" />
+            <div class="space-y-1.5" id="datePickerContainer">
+              <div class="flex items-center gap-1.5">
+                <input id="fieldDateStart" type="date" class="w-full h-9 px-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white text-xs focus:outline-none focus:border-[#ff9f1c]" />
+                <button type="button" data-action="clear-date-field" title="Clear date" class="text-xs px-2.5 h-9 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-400 hover:text-white transition">✕</button>
+              </div>
+              <div id="dateEndRow" class="hidden flex items-center gap-1.5">
+                <span class="text-xs text-slate-400 shrink-0">to</span>
+                <input id="fieldDateEnd" type="date" class="w-full h-9 px-2 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-white text-xs focus:outline-none focus:border-[#ff9f1c]" />
+              </div>
+            </div>
+            <input type="hidden" id="fieldConsumedDate" />
           </div>
         </div>
 
@@ -638,7 +666,7 @@
     </div>
   </div>
 
-  <!-- CONFIRMATION MODAL (FOR MASS REMOVAL) -->
+  <!-- CONFIRMATION MODAL (FOR DESTRUCTIVE ACTIONS - D2, D3) -->
   <div
     id="confirmModal"
     class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
@@ -646,17 +674,45 @@
     <div class="bg-[#2c3539] border border-[#3d494f] rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4">
       <div class="flex items-start gap-3">
         <div class="w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 font-bold">!</div>
-        <div>
-          <h4 id="confirmModalTitle" class="font-bold text-white text-base">Confirm Removal</h4>
+        <div class="flex-1 min-w-0">
+          <h4 id="confirmModalTitle" class="font-bold text-white text-base">Confirm Action</h4>
           <p id="confirmModalMessage" class="text-xs text-slate-300 mt-1 leading-relaxed"></p>
         </div>
       </div>
+
+      <!-- Pre-destructive backup prompt (D2) -->
+      <div class="p-2.5 rounded-xl bg-[#0d0e11] border border-[#3d494f] flex items-center justify-between gap-2">
+        <span class="text-[11px] text-slate-400">Save a copy before deleting:</span>
+        <button
+          type="button"
+          data-action="confirm-modal-backup"
+          id="confirmModalBackupBtn"
+          class="px-2.5 py-1 rounded bg-[#2c3539] hover:bg-[#364146] text-[#ff9f1c] border border-[#3d494f] text-[11px] font-semibold whitespace-nowrap transition"
+        >
+          💾 Download Backup
+        </button>
+      </div>
+
+      <!-- Phrase confirmation guardrail (D3) -->
+      <div id="confirmModalInputBox" class="hidden space-y-1.5">
+        <label id="confirmModalInputLabel" class="block text-xs text-rose-300">
+          Type <span class="font-mono font-bold text-white">DELETE</span> to confirm:
+        </label>
+        <input
+          id="confirmModalInput"
+          type="text"
+          placeholder="DELETE"
+          autocomplete="off"
+          class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-rose-500/50 text-white font-mono text-xs focus:outline-none focus:border-rose-400"
+        />
+      </div>
+
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-[#3d494f]">
         <button data-action="close-confirm-modal" class="h-8 px-3.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs text-slate-300 hover:text-white">
           Cancel
         </button>
-        <button id="confirmModalActionBtn" data-action="confirm-modal-proceed" class="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow">
-          Remove Permanently
+        <button id="confirmModalActionBtn" data-action="confirm-modal-proceed" class="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow transition">
+          Confirm
         </button>
       </div>
     </div>
@@ -680,21 +736,7 @@
         <button data-action="close-auth-modal" class="text-slate-400 hover:text-white text-lg leading-none">✕</button>
       </div>
 
-      <!-- Navigation Tabs -->
-      <div class="px-5 pt-3 border-b border-[#3d494f] bg-[#0d0e11]/30 flex gap-2">
-        <button
-          id="authTabAccountBtn"
-          data-action="switch-auth-tab"
-          data-tab="account"
-          class="px-3.5 py-1.5 text-xs font-bold rounded-t-lg bg-[#2c3539] text-[#ff9f1c] border-t border-x border-[#3d494f]"
-        >User Account</button>
-        <button
-          id="authTabSetupBtn"
-          data-action="switch-auth-tab"
-          data-tab="setup"
-          class="px-3.5 py-1.5 text-xs font-semibold rounded-t-lg text-slate-400 hover:text-white"
-        >Database Setup</button>
-      </div>
+
 
       <!-- Modal Body -->
       <div class="p-5 overflow-y-auto space-y-4">
@@ -753,15 +795,6 @@
             </div>
           </div>
 
-          <div class="p-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f]/70 text-[11px] text-slate-400 space-y-1">
-            <div class="flex items-center gap-1.5 text-[#ff9f1c] font-semibold">
-              <span>💡</span> Instant Access Tip:
-            </div>
-            <p class="leading-relaxed">
-              In your Supabase Dashboard under <strong>Authentication → Providers → Email</strong>, toggle OFF <strong>"Confirm email"</strong> so anyone can sign up and sync instantly without waiting for confirmation emails or hitting email limits!
-            </p>
-          </div>
-
           <p class="text-[11px] text-slate-400 text-center">
             Prefer not to sign in? OmniChart works 100% offline using your browser's local storage.
           </p>
@@ -795,7 +828,7 @@
               <span class="flex items-center gap-2">
                 <span>⬆️</span> Upload Local Entries to Cloud
               </span>
-              <span class="text-[10px] text-slate-400">Backup</span>
+              <span class="text-[10px] text-slate-400">Manual Push</span>
             </button>
 
             <button
@@ -805,7 +838,7 @@
               <span class="flex items-center gap-2">
                 <span>⬇️</span> Pull Latest Cloud Library
               </span>
-              <span class="text-[10px] text-slate-400">Fetch</span>
+              <span class="text-[10px] text-slate-400">Manual Pull</span>
             </button>
 
             <button
@@ -817,68 +850,11 @@
           </div>
         </div>
 
-        <!-- SETUP TAB: SUPABASE CONFIGURATION -->
-        <div id="authSetupView" class="hidden space-y-4">
-          <div class="text-xs text-slate-300 leading-relaxed">
-            Configure your Supabase project credentials. When set in <code class="text-[#ff9f1c] font-mono">js/sync.js</code> or below, anyone using your deployed tracker can create their own account and sync their library.
-          </div>
-
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Supabase Project URL</label>
-              <input
-                id="cfgSupabaseUrl"
-                type="text"
-                placeholder="https://your-project.supabase.co"
-                class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-[#ff9f1c]"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Supabase Anon Public Key</label>
-              <input
-                id="cfgSupabaseAnonKey"
-                type="password"
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                class="w-full h-9 px-3 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-[#ff9f1c]"
-              />
-            </div>
-            <div class="flex items-center justify-between pt-1">
-              <span id="cfgSaveNotice" class="text-xs text-emerald-400 font-semibold hidden">✓ Saved successfully</span>
-              <button
-                data-action="auth-save-config"
-                class="ml-auto h-8 px-4 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-xs transition shadow"
-              >Save Credentials</button>
-            </div>
-          </div>
-
-          <!-- SQL Schema Guide Accordion -->
-          <div class="border-t border-[#3d494f] pt-3">
-            <details class="group">
-              <summary class="text-xs font-semibold text-[#ff9f1c] cursor-pointer hover:underline flex items-center justify-between">
-                <span>📋 View SQL Table &amp; RLS Setup Script</span>
-                <span class="group-open:rotate-180 transition">▼</span>
-              </summary>
-              <div class="mt-2.5 p-3 rounded-xl bg-[#0d0e11] border border-[#3d494f] space-y-2">
-                <p class="text-[11px] text-slate-400">
-                  Run this in your <strong>Supabase SQL Editor</strong> to create the table and enable multi-user security:
-                </p>
-                <pre id="supabaseSqlCode" class="text-[10px] font-mono text-slate-300 bg-black/60 p-2.5 rounded-lg overflow-x-auto max-h-40 selection:bg-[#ff9f1c] selection:text-[#0d0e11]"></pre>
-                <button
-                  data-action="copy-sql-schema"
-                  class="h-7 px-3 rounded bg-[#2c3539] hover:bg-[#364146] text-slate-200 text-xs font-semibold border border-[#3d494f] flex items-center gap-1 transition"
-                >
-                  <span>Copy SQL Query</span>
-                </button>
-              </div>
-            </details>
-          </div>
-        </div>
-
       </div>
 
-      <!-- Modal Footer -->
+      <!-- Modal Footer (S2) -->
       <div class="px-5 py-3 border-t border-[#3d494f] bg-[#0d0e11]/60 flex items-center justify-between">
-        <span class="text-[11px] text-slate-400">🔒 Zero-knowledge Row-Level Security</span>
+        <span class="text-[11px] text-slate-400">🔒 Private to your account</span>
         <button data-action="close-auth-modal" class="h-8 px-4 rounded-lg bg-[#2c3539] hover:bg-[#364146] text-xs font-semibold text-slate-200">
           Close
         </button>
@@ -886,13 +862,71 @@
     </div>
   </div>
 
-  <!-- TOAST NOTIFICATION -->
-  <div id="toastBox" class="fixed bottom-4 right-4 z-50 hidden px-4 py-2.5 rounded-xl bg-[#2c3539] border border-[#ff9f1c] text-xs font-semibold text-white shadow-2xl"></div>
+  <!-- TOAST NOTIFICATION (N2, D3) -->
+  <div
+    id="toastBox"
+    class="fixed top-16 right-4 z-50 hidden max-w-sm rounded-xl bg-[#2c3539] border border-[#ff9f1c] text-xs text-white shadow-2xl p-3 flex items-center justify-between gap-3"
+  >
+    <span id="toastMessage" class="font-medium"></span>
+    <div class="flex items-center gap-2 shrink-0">
+      <button
+        id="toastUndoBtn"
+        data-action="toast-undo"
+        class="hidden px-2 py-0.5 rounded bg-[#ff9f1c] text-[#0d0e11] font-bold text-[11px] hover:bg-[#ffb144] transition"
+      >Undo</button>
+      <button
+        id="toastCloseBtn"
+        data-action="toast-close"
+        class="text-slate-400 hover:text-white text-base leading-none px-1"
+        title="Dismiss"
+      >✕</button>
+    </div>
+  </div>
+
+  <!-- MOBILE BOTTOM NAVIGATION (N1 Mobile) -->
+  <nav
+    id="mobileBottomNav"
+    class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0e11]/95 backdrop-blur-md border-t border-[#3d494f] flex items-center justify-around py-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+  >
+    <button
+      data-action="switch-view"
+      data-view="library"
+      id="mobileNavLibrary"
+      class="flex flex-col items-center gap-0.5 text-[#ff9f1c]"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+      </svg>
+      <span class="text-[10px] font-bold">Library</span>
+    </button>
+    <button
+      data-action="switch-view"
+      data-view="calendar"
+      id="mobileNavCalendar"
+      class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-white"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+      </svg>
+      <span class="text-[10px] font-semibold">Calendar</span>
+    </button>
+    <button
+      data-action="switch-view"
+      data-view="genre"
+      id="mobileNavGenre"
+      class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-white"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+      </svg>
+      <span class="text-[10px] font-semibold">Genres</span>
+    </button>
+  </nav>
 
   <!-- Modular JavaScript (load order matters: sync → api → app) -->
-  <script src="js/sync.js?v=4"></script>
-  <script src="js/api.js?v=4"></script>
-  <script src="js/app.js?v=4"></script>
+  <script src="js/sync.js?v=5"></script>
+  <script src="js/api.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
 
 </body>
 </html>

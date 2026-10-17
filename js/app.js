@@ -47,13 +47,39 @@ const ALL_POPULAR_GENRES = Array.from(new Set([
 // Toast Notification
 // ---------------------------------------------------------------------------
 
-function showToast(msg) {
-  const el = document.getElementById('toastBox');
-  if (!el) return;
-  el.textContent = msg;
-  el.classList.remove('hidden');
+function showToast(msg, options = {}) {
+  const box     = document.getElementById('toastBox');
+  const msgEl   = document.getElementById('toastMessage');
+  const undoBtn = document.getElementById('toastUndoBtn');
+  if (!box) return;
+
+  if (msgEl) msgEl.textContent = msg;
+  else box.textContent = msg;
+
+  if (undoBtn) {
+    if (options.undoAction && state.undoBuffer) {
+      undoBtn.classList.remove('hidden');
+    } else {
+      undoBtn.classList.add('hidden');
+    }
+  }
+
+  box.classList.remove('hidden');
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => el.classList.add('hidden'), 2800);
+  const duration = options.duration || 3200;
+  showToast._t = setTimeout(() => box.classList.add('hidden'), duration);
+}
+
+function updateGuestBanner() {
+  const banner = document.getElementById('guestStorageBanner');
+  if (!banner) return;
+  const isGuest = !state.user;
+  const dismissed = sessionStorage.getItem('omnichart_dismiss_guest_banner') === 'true';
+  if (isGuest && !dismissed) {
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -124,12 +150,10 @@ function getFilteredItems() {
 // ---------------------------------------------------------------------------
 
 function renderNavigation() {
-  const libCountEl = document.getElementById('menuLibraryCount');
-  if (libCountEl) libCountEl.textContent = state.items.length;
+  updateGuestBanner();
 
-  const calCountEl = document.getElementById('menuCalendarCount');
+  const libCount = state.items.length;
   const datedCount = state.items.filter((i) => parseDateOrRange(i.consumedDate)).length;
-  if (calCountEl) calCountEl.textContent = datedCount;
 
   // Genre count
   const genreSet = new Set();
@@ -141,19 +165,43 @@ function renderNavigation() {
       }
     }
   }
+  const genreCount = genreSet.size;
+
+  // Update counts in desktop nav and tome menu
+  const libCountEl  = document.getElementById('menuLibraryCount');
+  const calCountEl  = document.getElementById('menuCalendarCount');
   const genreCountEl = document.getElementById('menuGenreCount');
-  if (genreCountEl) genreCountEl.textContent = genreSet.size;
+  if (libCountEl)  libCountEl.textContent  = libCount;
+  if (calCountEl)  calCountEl.textContent  = datedCount;
+  if (genreCountEl) genreCountEl.textContent = genreCount;
 
-  const libBtn   = document.getElementById('menuViewLibrary');
-  const calBtn   = document.getElementById('menuViewCalendar');
-  const genreBtn = document.getElementById('menuViewGenre');
+  const topLibCount   = document.getElementById('navLibraryCount');
+  const topCalCount   = document.getElementById('navCalendarCount');
+  const topGenreCount = document.getElementById('navGenreCount');
+  if (topLibCount)   topLibCount.textContent   = libCount;
+  if (topCalCount)   topCalCount.textContent   = datedCount;
+  if (topGenreCount) topGenreCount.textContent = genreCount;
 
-  const activeCls   = 'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold bg-[#ff9f1c] text-[#0d0e11] transition';
-  const inactiveCls = 'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-[#364146] transition';
+  // Desktop Primary Navigation Tabs active state (N1)
+  const topNavLib   = document.getElementById('topNavLibrary');
+  const topNavCal   = document.getElementById('topNavCalendar');
+  const topNavGenre = document.getElementById('topNavGenre');
 
-  if (libBtn)   libBtn.className   = (state.view === 'library')  ? activeCls : inactiveCls;
-  if (calBtn)   calBtn.className   = (state.view === 'calendar') ? (activeCls + ' mt-0.5') : (inactiveCls + ' mt-0.5');
-  if (genreBtn) genreBtn.className = (state.view === 'genre')    ? (activeCls + ' mt-0.5') : (inactiveCls + ' mt-0.5');
+  const topActiveCls   = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-[#2c3539] text-[#ff9f1c] border border-[#3d494f] shadow-sm';
+  const topInactiveCls = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#364146] transition flex items-center gap-1.5';
+
+  if (topNavLib)   topNavLib.className   = (state.view === 'library')  ? topActiveCls : topInactiveCls;
+  if (topNavCal)   topNavCal.className   = (state.view === 'calendar') ? topActiveCls : topInactiveCls;
+  if (topNavGenre) topNavGenre.className = (state.view === 'genre')    ? topActiveCls : topInactiveCls;
+
+  // Mobile Bottom Navigation active state (N1 Mobile)
+  const mNavLib   = document.getElementById('mobileNavLibrary');
+  const mNavCal   = document.getElementById('mobileNavCalendar');
+  const mNavGenre = document.getElementById('mobileNavGenre');
+
+  if (mNavLib)   mNavLib.className   = `flex flex-col items-center gap-0.5 ${state.view === 'library' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
+  if (mNavCal)   mNavCal.className   = `flex flex-col items-center gap-0.5 ${state.view === 'calendar' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
+  if (mNavGenre) mNavGenre.className = `flex flex-col items-center gap-0.5 ${state.view === 'genre' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
 
   const catNav = document.getElementById('categoryNav');
   if (catNav) {
@@ -197,15 +245,13 @@ function renderNavigation() {
 
   const bulkToolbar = document.getElementById('bulkToolbar');
   const bulkModeBtn = document.getElementById('bulkModeBtn');
-  if (bulkToolbar && bulkModeBtn) {
+  if (bulkToolbar) {
     if (state.bulkMode) {
       bulkToolbar.classList.remove('hidden');
-      bulkModeBtn.className = 'h-8 px-2.5 rounded-lg bg-rose-600 text-white border border-rose-400 text-xs font-bold flex items-center gap-1.5 transition';
       const countEl = document.getElementById('bulkSelectedCount');
       if (countEl) countEl.textContent = `${state.selectedIds.size} selected`;
     } else {
       bulkToolbar.classList.add('hidden');
-      bulkModeBtn.className = 'h-8 px-2.5 rounded-lg bg-[#0d0e11] hover:bg-rose-950/60 border border-[#3d494f] hover:border-rose-500/60 text-xs text-slate-200 hover:text-rose-200 flex items-center gap-1.5 transition';
     }
   }
 
@@ -257,15 +303,15 @@ function renderAuthStatus() {
     if (iconEl)  iconEl.textContent  = '☁️';
     if (labelEl) labelEl.textContent = 'Sync';
     if (badgeEl) {
-      badgeEl.textContent = 'Guest';
+      badgeEl.textContent = 'Local only';
       badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold';
     }
   } else {
     if (iconEl)  iconEl.textContent  = '☁️';
-    if (labelEl) labelEl.textContent = 'Setup';
+    if (labelEl) labelEl.textContent = 'Sync';
     if (badgeEl) {
-      badgeEl.textContent = 'Setup';
-      badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-[#ff9f1c] font-bold';
+      badgeEl.textContent = 'Local only';
+      badgeEl.className   = 'text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-slate-400 font-bold';
     }
   }
 }
@@ -274,8 +320,6 @@ function openAuthModal(activeTab = 'account') {
   const modal = document.getElementById('authModal');
   if (!modal) return;
   modal.classList.remove('hidden');
-
-  switchAuthTab(activeTab);
 
   const loggedInView  = document.getElementById('authLoggedInView');
   const loggedOutView = document.getElementById('authLoggedOutView');
@@ -293,40 +337,15 @@ function openAuthModal(activeTab = 'account') {
     const pwdInput = document.getElementById('authPasswordInput');
     if (pwdInput) pwdInput.value = '';
   }
-
-  // Populate config tab inputs
-  if (typeof CloudSync !== 'undefined') {
-    const cfgUrl = document.getElementById('cfgSupabaseUrl');
-    const cfgKey = document.getElementById('cfgSupabaseAnonKey');
-    const sqlEl  = document.getElementById('supabaseSqlCode');
-    if (cfgUrl) cfgUrl.value = CloudSync.getUrl();
-    if (cfgKey) cfgKey.value = CloudSync.getAnonKey();
-    if (sqlEl)  sqlEl.textContent = CloudSync.getSqlSchema();
-  }
 }
 window.openAuthModal = openAuthModal;
 
 function switchAuthTab(tab) {
   state.authTab = tab;
-  const tabAccountBtn = document.getElementById('authTabAccountBtn');
-  const tabSetupBtn   = document.getElementById('authTabSetupBtn');
-  const accountView   = state.user ? document.getElementById('authLoggedInView') : document.getElementById('authLoggedOutView');
-  const setupView     = document.getElementById('authSetupView');
-
-  const activeCls   = 'px-3.5 py-1.5 text-xs font-bold rounded-t-lg bg-[#2c3539] text-[#ff9f1c] border-t border-x border-[#3d494f]';
-  const inactiveCls = 'px-3.5 py-1.5 text-xs font-semibold rounded-t-lg text-slate-400 hover:text-white';
-
-  if (tab === 'account') {
-    if (tabAccountBtn) tabAccountBtn.className = activeCls;
-    if (tabSetupBtn)   tabSetupBtn.className   = inactiveCls;
-    if (setupView)     setupView.classList.add('hidden');
-    if (accountView)   accountView.classList.remove('hidden');
-  } else {
-    if (tabAccountBtn) tabAccountBtn.className = inactiveCls;
-    if (tabSetupBtn)   tabSetupBtn.className   = activeCls;
-    if (accountView)   accountView.classList.add('hidden');
-    if (setupView)     setupView.classList.remove('hidden');
-  }
+  const accountView = state.user ? document.getElementById('authLoggedInView') : document.getElementById('authLoggedOutView');
+  const setupView   = document.getElementById('authSetupView');
+  if (setupView) setupView.classList.add('hidden');
+  if (accountView) accountView.classList.remove('hidden');
 }
 
 // ---------------------------------------------------------------------------
@@ -338,12 +357,45 @@ function renderLibrary() {
   if (!grid) return;
   const items = getFilteredItems();
 
+  if (state.items.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full bg-[#2c3539] border border-[#3d494f] rounded-2xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-4 shadow-xl">
+        <div class="w-16 h-16 rounded-2xl bg-[#ff9f1c]/15 text-[#ff9f1c] border border-[#ff9f1c]/30 flex items-center justify-center text-3xl mx-auto shadow-inner">
+          ✦
+        </div>
+        <div class="space-y-1.5">
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Welcome to OmniChart</h2>
+          <p class="text-sm text-slate-300 font-medium">Track anime, shows, movies, games, and books all in one place.</p>
+          <p class="text-xs text-slate-400">Keep track of your watch history, calendar dates, reviews, ratings, and genre tags.</p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <button data-action="open-add-modal" class="px-5 py-2.5 rounded-xl bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-xs transition shadow-lg flex items-center gap-2">
+            <span>+</span> Add your first title
+          </button>
+          <label class="px-4 py-2.5 rounded-xl bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 text-xs font-semibold cursor-pointer transition flex items-center gap-2">
+            <span>📂</span> Import JSON backup
+            <input id="onboardingImportInput" type="file" accept=".json,application/json" class="hidden" />
+          </label>
+        </div>
+      </div>
+    `;
+    const onboardInp = document.getElementById('onboardingImportInput');
+    if (onboardInp) {
+      onboardInp.addEventListener('change', (e) => {
+        if (e.target.files?.[0]) importLibraryJSON(e.target.files[0]);
+      });
+    }
+    return;
+  }
+
   if (items.length === 0) {
     grid.innerHTML = `
-      <div class="col-span-full bg-[#2c3539] border border-[#3d494f] rounded-2xl p-10 text-center space-y-3">
-        <div class="text-base font-bold text-white">Your library is empty or no entries match your filter</div>
-        <p class="text-xs text-slate-400">Click + Add Media or use Import in the top-right to load your LiveChart JSON.</p>
-        <button data-action="open-add-modal" class="px-4 py-2 rounded-lg bg-[#ff9f1c] text-[#0d0e11] font-bold text-xs">+ Add Media</button>
+      <div class="col-span-full bg-[#2c3539] border border-[#3d494f] rounded-2xl p-8 text-center space-y-3">
+        <div class="text-base font-bold text-white">No titles match your current search or filters</div>
+        <p class="text-xs text-slate-400">Try clearing your search query or switching category / status filter.</p>
+        <button data-action="clear-library-search" class="px-4 py-2 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-slate-200 font-semibold text-xs transition">
+          Clear Search Filter
+        </button>
       </div>
     `;
     return;
@@ -364,6 +416,7 @@ function renderLibrary() {
     const isSelected    = state.selectedIds.has(item.id);
     const posterSrc     = item.image || makeFallbackPoster(item.title);
     const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+    const cleanStudio   = Array.from(new Set((item.studio || 'Unknown Studio').split(',').map((s) => s.trim()).filter(Boolean))).join(', ') || 'Unknown Studio';
 
     return `
       <article
@@ -424,9 +477,9 @@ function renderLibrary() {
           ` : ''}
         </div>
 
-        <!-- Studio & Popped-Out Genres Ribbon -->
+        <!-- Studio & Popped-Out Genres Ribbon (L3) -->
         <div class="px-3.5 py-1.5 bg-[#0d0e11]/50 border-b border-[#3d494f] flex items-center justify-between gap-2 text-[11px]">
-          <span class="font-semibold text-slate-300 truncate text-xs" title="${esc(item.studio || 'Unknown Studio')}">${esc(item.studio || 'Unknown Studio')}</span>
+          <span class="font-semibold text-slate-300 truncate text-xs" title="${esc(cleanStudio)}">${esc(cleanStudio)}</span>
           <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             ${(item.genres || []).map((g) => `
               <button
@@ -448,6 +501,8 @@ function renderLibrary() {
               alt="${esc(item.title)}"
               data-fallback-title="${esc(item.title)}"
               class="poster-img w-full h-full object-cover"
+              loading="lazy"
+              referrerpolicy="no-referrer"
             />
             <button
               data-action="${isOwner ? 'edit-item' : 'view-item'}"
@@ -571,6 +626,19 @@ function renderCalendar() {
     }
   }
 
+  // Monthly summary stats (C1)
+  const currentMonthPrefix = `${state.calYear}-${state.calMonth}-`;
+  let monthEventCount = 0;
+  for (const [key, evList] of eventsByKey.entries()) {
+    if (key.startsWith(currentMonthPrefix)) monthEventCount += evList.length;
+  }
+  const summaryEl = document.getElementById('calendarMonthSummary');
+  if (summaryEl) {
+    summaryEl.textContent = monthEventCount > 0
+      ? `${monthEventCount} ${monthEventCount === 1 ? 'item' : 'items'} in ${monthNames[state.calMonth]}`
+      : `No items in ${monthNames[state.calMonth]}`;
+  }
+
   const jumpBar = document.getElementById('calendarJumpBar');
   const monthEntries = Array.from(loggedMonths.entries());
   if (jumpBar) {
@@ -591,7 +659,7 @@ function renderCalendar() {
           >${esc(label)}</button>`;
         }).join('');
     } else {
-      jumpBar.innerHTML = `<span class="text-xs text-slate-400">Click + on any calendar day or edit an entry to add a Date / Range.</span>`;
+      jumpBar.innerHTML = `<span class="text-xs text-slate-400">Add dates or ranges to your library entries to visualize them here on the calendar.</span>`;
     }
   }
 
@@ -620,7 +688,7 @@ function renderCalendar() {
               data-action="add-on-date"
               data-date="${dateStr}"
               title="Add Media on ${dateStr}"
-              class="w-5 h-5 rounded bg-[#0d0e11] hover:bg-[#ff9f1c] text-slate-300 hover:text-[#0d0e11] text-xs font-bold leading-none"
+              class="w-5 h-5 rounded bg-[#0d0e11] hover:bg-[#ff9f1c] text-slate-300 hover:text-[#0d0e11] text-xs font-bold leading-none border border-[#3d494f] hover:border-[#ff9f1c] transition"
             >+</button>
           ` : ''}
         </div>
@@ -631,13 +699,14 @@ function renderCalendar() {
               : badge === 'START'
                 ? 'bg-emerald-400 text-[#0d0e11]'
                 : 'bg-sky-400 text-[#0d0e11]';
+            const badgeLabel = badge === 'DAY' ? 'Day' : badge === 'START' ? 'Start' : 'End';
             return `
               <button
                 data-action="edit-item"
                 data-id="${esc(item.id)}"
                 class="w-full text-left p-1 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] flex items-center gap-1.5 text-[11px]"
               >
-                <span class="px-1 rounded text-[9px] font-extrabold ${badgeCls}">${badge}</span>
+                <span class="px-1 rounded text-[9px] font-extrabold ${badgeCls}">${badgeLabel}</span>
                 <span class="truncate text-slate-100 font-medium">${esc(item.title)}</span>
               </button>
             `;
@@ -795,11 +864,18 @@ function renderGenreView() {
     return;
   }
 
-  // Render Sections
+  // Render Sections (G1, G3)
   const isOwner = OwnerMode.isOwner();
+  state.genreExpanded = state.genreExpanded || {};
+
   grid.innerHTML = genreEntries.map((entry) => {
     const slug = entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const avgRatingStr = entry.avgRating > 0 ? `${entry.avgRating.toFixed(1).replace(/\.0$/, '')} ★` : 'Unrated';
+    const isUncategorized = entry.name.toLowerCase() === 'uncategorized';
+    const isExpanded = state.genreExpanded[entry.name] === true;
+    const PAGE_SIZE = 12;
+    const visibleItems = isExpanded ? entry.items : entry.items.slice(0, PAGE_SIZE);
+    const hasMore = entry.items.length > PAGE_SIZE;
 
     return `
       <section id="genre-sec-${slug}" class="bg-[#2c3539]/70 border border-[#3d494f] rounded-2xl p-4 sm:p-5 space-y-4 scroll-mt-20">
@@ -820,22 +896,36 @@ function renderGenreView() {
             </div>
           </div>
 
-          <button
-            type="button"
-            data-action="open-genre-in-library"
-            data-genre="${esc(entry.name)}"
-            class="h-7 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] text-xs font-semibold text-slate-200 hover:text-[#ff9f1c] flex items-center gap-1.5 transition"
-          >
-            <span>View in Library</span>
-            <svg class="w-3.5 h-3.5 text-[#ff9f1c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-            </svg>
-          </button>
+          <div class="flex items-center gap-2">
+            ${isUncategorized ? `
+              <button
+                type="button"
+                data-action="fix-uncategorized"
+                class="h-7 px-3 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] text-xs font-bold flex items-center gap-1.5 transition shadow"
+                title="Fetch metadata and auto-assign genres to uncategorized titles"
+              >
+                <span>⚡</span>
+                <span>Fix these</span>
+              </button>
+            ` : ''}
+
+            <button
+              type="button"
+              data-action="open-genre-in-library"
+              data-genre="${esc(entry.name)}"
+              class="h-7 px-3 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] hover:border-[#ff9f1c] text-xs font-semibold text-slate-200 hover:text-[#ff9f1c] flex items-center gap-1.5 transition"
+            >
+              <span>View in Library</span>
+              <svg class="w-3.5 h-3.5 text-[#ff9f1c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <!-- Media Cards Grid -->
+        <!-- Media Cards Grid (Paginated first 12 cards - G1) -->
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-          ${entry.items.map((item) => {
+          ${visibleItems.map((item) => {
             const rating = Number(item.rating || 0);
             const isMasterpiece = rating >= 9;
             const posterSrc = item.image || makeFallbackPoster(item.title);
@@ -865,6 +955,7 @@ function renderGenreView() {
                     data-fallback-title="${esc(item.title)}"
                     class="poster-img w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     loading="lazy"
+                    referrerpolicy="no-referrer"
                   />
                   ${rating > 0 ? `
                     <div class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold shadow flex items-center gap-0.5 ${
@@ -895,6 +986,19 @@ function renderGenreView() {
             `;
           }).join('')}
         </div>
+
+        ${hasMore ? `
+          <div class="pt-2 flex justify-center border-t border-[#3d494f]/50">
+            <button
+              type="button"
+              data-action="toggle-genre-expand"
+              data-genre="${esc(entry.name)}"
+              class="px-4 py-1.5 rounded-lg bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5"
+            >
+              <span>${isExpanded ? '▴ Show fewer titles' : `▾ Show all ${entry.items.length} titles`}</span>
+            </button>
+          </div>
+        ` : ''}
       </section>
     `;
   }).join('');
@@ -1131,6 +1235,34 @@ function openMediaModal(item = null, presetDate = '') {
   else if (catVal === 'Games')  mappedCategory = 'games';
   else if (catVal === 'Books')  mappedCategory = 'books';
 
+  const consumedStr = item ? (item.consumedDate || '') : (presetDate || '');
+  document.getElementById('fieldConsumedDate').value = consumedStr;
+
+  const parsedDate  = parseDateOrRange(consumedStr);
+  const dateStartEl = document.getElementById('fieldDateStart');
+  const dateEndEl   = document.getElementById('fieldDateEnd');
+  const rangeToggle = document.getElementById('fieldRangeToggle');
+  const endRow      = document.getElementById('dateEndRow');
+
+  if (parsedDate) {
+    if (parsedDate.type === 'range') {
+      if (dateStartEl) dateStartEl.value = formatDDMMYYYYtoInputDate(parsedDate.start.label);
+      if (dateEndEl)   dateEndEl.value   = formatDDMMYYYYtoInputDate(parsedDate.end.label);
+      if (rangeToggle) rangeToggle.checked = true;
+      if (endRow)      endRow.classList.remove('hidden');
+    } else {
+      if (dateStartEl) dateStartEl.value = formatDDMMYYYYtoInputDate(parsedDate.start.label);
+      if (dateEndEl)   dateEndEl.value   = '';
+      if (rangeToggle) rangeToggle.checked = false;
+      if (endRow)      endRow.classList.add('hidden');
+    }
+  } else {
+    if (dateStartEl) dateStartEl.value = '';
+    if (dateEndEl)   dateEndEl.value   = '';
+    if (rangeToggle) rangeToggle.checked = false;
+    if (endRow)      endRow.classList.add('hidden');
+  }
+
   if (item) {
     document.getElementById('modalTitle').textContent     = 'Edit Media';
     document.getElementById('fieldId').value              = item.id;
@@ -1142,7 +1274,6 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('fieldTotalUnits').value       = item.totalUnits ?? 12;
     document.getElementById('fieldStudio').value           = item.studio || '';
     document.getElementById('fieldReleaseDate').value      = item.releaseDate || '';
-    document.getElementById('fieldConsumedDate').value     = item.consumedDate || '';
     document.getElementById('fieldImage').value            = item.image || '';
     document.getElementById('fieldNotes').value            = item.notes || '';
     document.getElementById('fieldSynopsis').value         = item.synopsis || '';
@@ -1162,7 +1293,6 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('fieldTotalUnits').value       = 12;
     document.getElementById('fieldStudio').value           = '';
     document.getElementById('fieldReleaseDate').value      = '';
-    document.getElementById('fieldConsumedDate').value     = presetDate || '';
     document.getElementById('fieldImage').value            = '';
     document.getElementById('fieldNotes').value            = '';
     document.getElementById('fieldSynopsis').value         = '';
@@ -1186,6 +1316,44 @@ function openMediaModal(item = null, presetDate = '') {
   document.getElementById('mediaModal').classList.remove('hidden');
 }
 
+function formatDDMMYYYYtoInputDate(str) {
+  const p = parseSingleDDMMYYYY(str);
+  if (!p) return '';
+  const mm = String(p.month + 1).padStart(2, '0');
+  const dd = String(p.day).padStart(2, '0');
+  return `${p.year}-${mm}-${dd}`;
+}
+
+function formatInputDateToDDMMYYYY(val) {
+  if (!val) return '';
+  const parts = val.split('-');
+  if (parts.length !== 3) return '';
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  return `${d}-${m}-${y}`;
+}
+
+function syncDatePickerToHiddenField() {
+  const startVal  = document.getElementById('fieldDateStart')?.value;
+  const isRange   = document.getElementById('fieldRangeToggle')?.checked;
+  const endVal    = document.getElementById('fieldDateEnd')?.value;
+  const hiddenInp = document.getElementById('fieldConsumedDate');
+  if (!hiddenInp) return;
+
+  if (!startVal) {
+    hiddenInp.value = '';
+    return;
+  }
+  const startFmt = formatInputDateToDDMMYYYY(startVal);
+  if (isRange && endVal) {
+    const endFmt = formatInputDateToDDMMYYYY(endVal);
+    hiddenInp.value = `${startFmt} to ${endFmt}`;
+  } else {
+    hiddenInp.value = startFmt;
+  }
+}
+
 function saveMediaFromModal() {
   if (!OwnerMode.isOwner()) {
     showToast('Read-Only mode: Cannot save changes');
@@ -1197,6 +1365,9 @@ function saveMediaFromModal() {
     showToast('Please enter a title');
     return;
   }
+
+  syncDatePickerToHiddenField();
+
   const id         = document.getElementById('fieldId').value || ('id-' + Date.now());
   const category   = document.getElementById('fieldCategory').value;
   const rawStatus  = document.getElementById('fieldStatus').value;
@@ -1209,6 +1380,14 @@ function saveMediaFromModal() {
   const unitName = category === 'Movies' ? 'movie' : category === 'Books' ? 'chs' : category === 'Games' ? 'hrs' : 'eps';
   const genres   = [...currentModalGenres];
 
+  // Protect manually-edited fields from being clobbered during metadata enrichment (B3)
+  const existingItem = state.items.find((i) => i.id === id);
+  const manualFields = new Set(existingItem?._manualFields || []);
+  if (document.getElementById('fieldStudio').value.trim()) manualFields.add('studio');
+  if (document.getElementById('fieldReleaseDate').value.trim()) manualFields.add('releaseDate');
+  if (genres.length > 0) manualFields.add('genres');
+  if (document.getElementById('fieldSynopsis').value.trim()) manualFields.add('synopsis');
+
   const entry = {
     id,
     title,
@@ -1218,14 +1397,15 @@ function saveMediaFromModal() {
     progress,
     totalUnits,
     unitName,
-    studio:       document.getElementById('fieldStudio').value.trim() || 'Unknown Studio',
-    releaseDate:  document.getElementById('fieldReleaseDate').value.trim() || 'TBA',
-    consumedDate: document.getElementById('fieldConsumedDate').value.trim(),
+    studio:        document.getElementById('fieldStudio').value.trim() || 'Unknown Studio',
+    releaseDate:   document.getElementById('fieldReleaseDate').value.trim() || 'TBA',
+    consumedDate:  document.getElementById('fieldConsumedDate').value.trim(),
     genres,
-    image:        document.getElementById('fieldImage').value.trim(),
-    notes:        document.getElementById('fieldNotes').value.trim(),
-    synopsis:     document.getElementById('fieldSynopsis').value.trim(),
-    updatedAt:    Date.now()
+    image:         document.getElementById('fieldImage').value.trim(),
+    notes:         document.getElementById('fieldNotes').value.trim(),
+    synopsis:      document.getElementById('fieldSynopsis').value.trim(),
+    _manualFields: Array.from(manualFields),
+    updatedAt:     Date.now()
   };
 
   const idx = state.items.findIndex((i) => i.id === id);
@@ -1241,11 +1421,45 @@ function saveMediaFromModal() {
   showToast('Saved entry');
 }
 
-function openConfirmModal(title, message, onConfirm) {
-  document.getElementById('confirmModalTitle').textContent   = title;
-  document.getElementById('confirmModalMessage').textContent = message;
+function openConfirmModal(options, msgLegacy, onConfirmLegacy) {
+  let title, message, onConfirm, requirePhrase;
+  if (typeof options === 'string') {
+    title = options;
+    message = msgLegacy;
+    onConfirm = onConfirmLegacy;
+    requirePhrase = null;
+  } else {
+    title = options.title;
+    message = options.message;
+    onConfirm = options.onConfirm;
+    requirePhrase = options.requirePhrase || null;
+  }
+
+  const modal     = document.getElementById('confirmModal');
+  const titleEl   = document.getElementById('confirmModalTitle');
+  const msgEl     = document.getElementById('confirmModalMessage');
+  const inputRow  = document.getElementById('confirmModalInputBox');
+  const inputEl   = document.getElementById('confirmModalInput');
+  const actionBtn = document.getElementById('confirmModalActionBtn');
+
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
   state.pendingConfirmFn = onConfirm;
-  document.getElementById('confirmModal').classList.remove('hidden');
+  state.confirmRequirePhrase = requirePhrase;
+
+  if (requirePhrase) {
+    if (inputRow) inputRow.classList.remove('hidden');
+    if (inputEl) {
+      inputEl.value = '';
+      inputEl.placeholder = requirePhrase;
+    }
+    if (actionBtn) actionBtn.classList.add('opacity-50', 'pointer-events-none');
+  } else {
+    if (inputRow) inputRow.classList.add('hidden');
+    if (actionBtn) actionBtn.classList.remove('opacity-50', 'pointer-events-none');
+  }
+
+  if (modal) modal.classList.remove('hidden');
 }
 
 // ---------------------------------------------------------------------------
@@ -1253,10 +1467,16 @@ function openConfirmModal(title, message, onConfirm) {
 // ---------------------------------------------------------------------------
 
 document.addEventListener('click', async (e) => {
-  const btn      = e.target.closest('[data-action]');
-  const dropdown = document.getElementById('tomeDropdown');
+  const btn         = e.target.closest('[data-action]');
+  const dropdown    = document.getElementById('tomeDropdown');
+  const moreActions = document.getElementById('moreActionsMenu');
+
   if (!e.target.closest('#tomeMenuBtn') && !e.target.closest('#tomeDropdown') && dropdown) {
     dropdown.classList.add('hidden');
+  }
+
+  if (!e.target.closest('#moreActionsBtn') && !e.target.closest('#moreActionsMenu') && moreActions) {
+    moreActions.classList.add('hidden');
   }
 
   // Close genre suggestions dropdown when clicking outside
@@ -1270,6 +1490,8 @@ document.addEventListener('click', async (e) => {
 
   if (action === 'toggle-tome-menu') {
     if (dropdown) dropdown.classList.toggle('hidden');
+  } else if (action === 'toggle-more-actions') {
+    if (moreActions) moreActions.classList.toggle('hidden');
   } else if (action === 'switch-view') {
     state.view = btn.dataset.view;
     if (dropdown) dropdown.classList.add('hidden');
@@ -1309,6 +1531,7 @@ document.addEventListener('click', async (e) => {
       return;
     }
     const id = btn.dataset.id;
+    state.undoBuffer = { previousItems: JSON.parse(JSON.stringify(state.items)) };
     state.items = state.items.filter((i) => i.id !== id);
     state.selectedIds.delete(id);
     saveItems();
@@ -1316,7 +1539,23 @@ document.addEventListener('click', async (e) => {
       CloudSync.deleteItem(id);
     }
     renderAll();
-    showToast('Entry removed');
+    showToast('Entry removed', { undoAction: true, duration: 6000 });
+  } else if (action === 'toast-close') {
+    document.getElementById('toastBox')?.classList.add('hidden');
+    clearTimeout(showToast._t);
+  } else if (action === 'toast-undo') {
+    if (state.undoBuffer && Array.isArray(state.undoBuffer.previousItems)) {
+      state.items = state.undoBuffer.previousItems;
+      state.undoBuffer = null;
+      saveItems();
+      renderAll();
+      showToast('Action undone! Restored library entries.');
+    }
+  } else if (action === 'dismiss-guest-banner') {
+    sessionStorage.setItem('omnichart_dismiss_guest_banner', 'true');
+    updateGuestBanner();
+  } else if (action === 'confirm-modal-backup') {
+    exportLibraryJSON();
   } else if (action === 'step-progress') {
     e.stopPropagation();
     if (!OwnerMode.isOwner()) {
@@ -1366,8 +1605,25 @@ document.addEventListener('click', async (e) => {
     openMediaModal(null, btn.dataset.date);
   } else if (action === 'fill-today-date') {
     const d = new Date();
-    const inp = document.getElementById('fieldConsumedDate');
-    if (inp) inp.value = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dStart = document.getElementById('fieldDateStart');
+    if (dStart) {
+      dStart.value = `${y}-${m}-${day}`;
+      syncDatePickerToHiddenField();
+    }
+  } else if (action === 'clear-date-field') {
+    const dStart = document.getElementById('fieldDateStart');
+    const dEnd   = document.getElementById('fieldDateEnd');
+    const dRaw   = document.getElementById('fieldConsumedDate');
+    const rTog   = document.getElementById('fieldRangeToggle');
+    const endRow = document.getElementById('dateEndRow');
+    if (dStart) dStart.value = '';
+    if (dEnd)   dEnd.value   = '';
+    if (dRaw)   dRaw.value   = '';
+    if (rTog)   rTog.checked = false;
+    if (endRow) endRow.classList.add('hidden');
   } else if (action === 'append-date-to') {
     const inp = document.getElementById('fieldConsumedDate');
     if (inp) {
@@ -1395,6 +1651,7 @@ document.addEventListener('click', async (e) => {
     }
   } else if (action === 'enrich-library') {
     if (dropdown) dropdown.classList.add('hidden');
+    if (moreActions) moreActions.classList.add('hidden');
     if (!OwnerMode.isOwner()) {
       showToast('Read-Only mode: Enter owner passcode to enrich library');
       return;
@@ -1403,10 +1660,12 @@ document.addEventListener('click', async (e) => {
   } else if (action === 'stop-enrich') {
     state.enrichStopRequested = true;
   } else if (action === 'export-json') {
+    if (moreActions) moreActions.classList.add('hidden');
     exportLibraryJSON();
   } else if (action === 'toggle-bulk-mode') {
+    if (moreActions) moreActions.classList.add('hidden');
     if (!OwnerMode.isOwner()) {
-      showToast('Read-Only mode: Mass removal requires Owner Mode');
+      showToast('Read-Only mode: Bulk delete requires Owner Mode');
       return;
     }
     state.bulkMode = !state.bulkMode;
@@ -1447,49 +1706,54 @@ document.addEventListener('click', async (e) => {
       showToast('Select at least 1 entry first');
       return;
     }
-    openConfirmModal(
-      `Remove ${count} Selected Entries?`,
-      `This will permanently remove the ${count} selected entries from your OmniChart library.`,
-      () => {
+    openConfirmModal({
+      title: `Delete ${count} Selected Entries?`,
+      message: `This will remove the ${count} selected entries from your library.`,
+      onConfirm: () => {
+        state.undoBuffer = { previousItems: JSON.parse(JSON.stringify(state.items)) };
         state.items = state.items.filter((i) => !state.selectedIds.has(i.id));
         state.selectedIds.clear();
         saveItems();
         renderAll();
-        showToast(`Removed ${count} entries`);
+        showToast(`Removed ${count} entries`, { undoAction: true, duration: 6000 });
       }
-    );
+    });
   } else if (action === 'bulk-delete-filtered') {
     if (!OwnerMode.isOwner()) return;
     const visible = getFilteredItems();
     if (visible.length === 0) return;
-    openConfirmModal(
-      `Remove All ${visible.length} Shown Entries?`,
-      `This will remove all ${visible.length} entries currently matching your active category/status/search filter.`,
-      () => {
+    openConfirmModal({
+      title: `Delete All ${visible.length} Shown Entries?`,
+      message: `This will remove all ${visible.length} entries currently matching your active filter.`,
+      requirePhrase: 'DELETE',
+      onConfirm: () => {
+        state.undoBuffer = { previousItems: JSON.parse(JSON.stringify(state.items)) };
         const removeSet = new Set(visible.map((i) => i.id));
         state.items = state.items.filter((i) => !removeSet.has(i.id));
         state.selectedIds.clear();
         saveItems();
         renderAll();
-        showToast(`Removed ${visible.length} entries`);
+        showToast(`Removed ${visible.length} entries`, { undoAction: true, duration: 6000 });
       }
-    );
+    });
   } else if (action === 'bulk-wipe-all') {
     if (!OwnerMode.isOwner()) return;
     if (state.items.length === 0) return;
     const total = state.items.length;
-    openConfirmModal(
-      `Wipe Entire Library (${total} Entries)?`,
-      `This will clear all ${total} entries from OmniChart so you can start fresh or import a clean JSON file.`,
-      () => {
+    openConfirmModal({
+      title: `Wipe Entire Library (${total} Entries)?`,
+      message: `This will completely clear all ${total} entries from OmniChart so you can start fresh. Make sure to download a backup copy first!`,
+      requirePhrase: 'DELETE',
+      onConfirm: () => {
+        state.undoBuffer = { previousItems: JSON.parse(JSON.stringify(state.items)) };
         state.items = [];
         state.selectedIds.clear();
         state.bulkMode = false;
         saveItems();
         renderAll();
-        showToast('Library wiped clean');
+        showToast('Library wiped clean', { undoAction: true, duration: 7000 });
       }
-    );
+    });
   } else if (action === 'close-confirm-modal') {
     document.getElementById('confirmModal').classList.add('hidden');
     state.pendingConfirmFn = null;
@@ -1497,6 +1761,22 @@ document.addEventListener('click', async (e) => {
     document.getElementById('confirmModal').classList.add('hidden');
     if (typeof state.pendingConfirmFn === 'function') state.pendingConfirmFn();
     state.pendingConfirmFn = null;
+  } else if (action === 'toggle-genre-expand') {
+    const genre = btn.dataset.genre;
+    state.genreExpanded = state.genreExpanded || {};
+    state.genreExpanded[genre] = !state.genreExpanded[genre];
+    renderGenreView();
+  } else if (action === 'fix-uncategorized') {
+    const uncategorizedItems = state.items.filter((item) => {
+      return !item.genres || !Array.isArray(item.genres) || item.genres.length === 0 ||
+        (item.genres.length === 1 && item.genres[0].toLowerCase() === 'uncategorized');
+    });
+    if (uncategorizedItems.length === 0) {
+      showToast('No uncategorized titles to fix!');
+    } else {
+      showToast(`Fetching genres for ${uncategorizedItems.length} uncategorized titles...`);
+      enrichMissingMetadata(false, uncategorizedItems);
+    }
   } else if (action === 'toggle-owner-auth') {
     if (OwnerMode.isOwner()) {
       if (confirm('Lock Owner Mode and switch to Public Read-Only View?')) {
@@ -1794,17 +2074,94 @@ if (fImg) {
   });
 }
 
+function compressImageFile(file, maxWidth = 360, maxHeight = 540, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth || h > maxHeight) {
+          const ratio = Math.min(maxWidth / w, maxHeight / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 const posterUpload = document.getElementById('posterUploadInput');
 if (posterUpload) {
-  posterUpload.addEventListener('change', (e) => {
+  posterUpload.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      document.getElementById('fieldImage').value = reader.result;
-      updateModalPosterPreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      showToast('Compressing image...');
+      const compressedDataUrl = await compressImageFile(file);
+      document.getElementById('fieldImage').value = compressedDataUrl;
+      updateModalPosterPreview(compressedDataUrl);
+      showToast('Poster uploaded & compressed');
+    } catch (err) {
+      showToast('Could not process image');
+    }
+  });
+}
+
+// Date Picker Synchronization Listeners (F4)
+const dStartInp = document.getElementById('fieldDateStart');
+if (dStartInp) {
+  dStartInp.addEventListener('change', () => {
+    syncDatePickerToHiddenField();
+  });
+}
+
+const dEndInp = document.getElementById('fieldDateEnd');
+if (dEndInp) {
+  dEndInp.addEventListener('change', () => {
+    syncDatePickerToHiddenField();
+  });
+}
+
+const rToggle = document.getElementById('fieldRangeToggle');
+if (rToggle) {
+  rToggle.addEventListener('change', (e) => {
+    const endRow = document.getElementById('dateEndRow');
+    if (endRow) {
+      if (e.target.checked) {
+        endRow.classList.remove('hidden');
+      } else {
+        endRow.classList.add('hidden');
+        const endInput = document.getElementById('fieldDateEnd');
+        if (endInput) endInput.value = '';
+      }
+    }
+    syncDatePickerToHiddenField();
+  });
+}
+
+// Guardrail confirmation phrase listener (D3)
+const confirmPhraseInp = document.getElementById('confirmModalInput');
+if (confirmPhraseInp) {
+  confirmPhraseInp.addEventListener('input', () => {
+    const actionBtn = document.getElementById('confirmModalActionBtn');
+    if (!state.confirmRequirePhrase || !actionBtn) return;
+    if (confirmPhraseInp.value.trim().toUpperCase() === state.confirmRequirePhrase.toUpperCase()) {
+      actionBtn.classList.remove('opacity-50', 'pointer-events-none');
+    } else {
+      actionBtn.classList.add('opacity-50', 'pointer-events-none');
+    }
   });
 }
 
@@ -1936,8 +2293,4 @@ renderAll();
 
 if (typeof CloudSync !== 'undefined' && CloudSync.init) {
   CloudSync.init();
-}
-
-if (state.items.some((i) => !isBrokenTitle(i.title) && (i.studio === 'Unknown Studio' || !i.synopsis || i.releaseDate === 'TBA'))) {
-  enrichMissingMetadata(false);
 }

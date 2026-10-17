@@ -8,6 +8,19 @@
 const STORAGE_KEY = 'omnichart_v4_items';
 
 // ---------------------------------------------------------------------------
+// HTML Escaping Utility for XSS Prevention
+// ---------------------------------------------------------------------------
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+window.esc = esc;
+
+// ---------------------------------------------------------------------------
 // Cloud Sync & Deployment Configuration
 // ---------------------------------------------------------------------------
 const OMNICHART_CONFIG = {
@@ -67,7 +80,8 @@ const state = window.state = {
   genreSearch:         '',
   user:                null,
   cloudStatus:         'offline',
-  authTab:             'account'
+  authTab:             'account',
+  undoBuffer:          null
 };
 
 // ---------------------------------------------------------------------------
@@ -267,6 +281,8 @@ function exportLibraryJSON() {
   a.href     = URL.createObjectURL(blob);
   a.download = `omnichart-export-${state.items.length}.json`;
   a.click();
+  localStorage.setItem('omnichart_last_backup_time', String(Date.now()));
+  if (typeof updateGuestBanner === 'function') updateGuestBanner();
 }
 
 // ---------------------------------------------------------------------------
@@ -505,6 +521,7 @@ const CloudSync = {
         console.warn('[CloudSync] Upsert error:', error.message);
         return { error };
       }
+      this._lastLocalPushTime = Date.now();
       return { ok: true, count: rows.length };
     } catch (err) {
       console.warn('[CloudSync] Push exception:', err);
@@ -518,6 +535,7 @@ const CloudSync = {
     const client = this.getClient();
     if (!client) return;
     try {
+      this._lastLocalPushTime = Date.now();
       await client
         .from(OMNICHART_CONFIG.supabase.tableName)
         .delete()
@@ -595,12 +613,16 @@ const CloudSync = {
             filter: `user_id=eq.${state.user.id}`
           },
           async () => {
+            const timeSincePush = Date.now() - (CloudSync._lastLocalPushTime || 0);
+            const isSelfPush = timeSincePush < 4000;
             const remoteItems = await this.pull();
             if (remoteItems) {
               state.items = remoteItems;
               saveItems(false);
               if (typeof renderAll === 'function') renderAll();
-              if (typeof showToast === 'function') showToast('⚡ Synced changes from your other device');
+              if (!isSelfPush && typeof showToast === 'function') {
+                showToast('⚡ Synced changes from your other device');
+              }
             }
           }
         )

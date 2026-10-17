@@ -135,8 +135,9 @@ async function runAutoSearch(query) {
       for (const m of json?.data?.Page?.media || []) {
         const isMovie     = m.format === 'MOVIE';
         const studioNodes = m.studios?.nodes || [];
-        const anim        = studioNodes.filter((n) => n.isAnimationStudio).map((n) => n.name);
-        const studio      = (anim.length ? anim : studioNodes.map((n) => n.name)).slice(0, 2).join(', ') || 'Unknown Studio';
+        const anim        = Array.from(new Set(studioNodes.filter((n) => n.isAnimationStudio).map((n) => n.name).filter(Boolean)));
+        const allNames    = Array.from(new Set(studioNodes.map((n) => n.name).filter(Boolean)));
+        const studio      = (anim.length ? anim : allNames).slice(0, 2).join(', ') || 'Unknown Studio';
         results.push({
           title:       m.title?.english || m.title?.romaji || q,
           category:    isMovie ? 'Movies' : 'Series & Anime',
@@ -196,7 +197,7 @@ async function runAutoSearch(query) {
  * Walk through every library item that is missing Studio, Release Date,
  * Genres, or Synopsis and batch-query AniList to auto-fill them.
  */
-async function enrichMissingMetadata(forceAll = false) {
+async function enrichMissingMetadata(forceAll = false, customTargets = null) {
   if (state.enrichRunning) return;
 
   // First run ID title recovery
@@ -204,7 +205,7 @@ async function enrichMissingMetadata(forceAll = false) {
     sanitizeAndRecoverItems(state.items);
   }
 
-  const targets = state.items.filter((item) => {
+  const targets = Array.isArray(customTargets) ? customTargets : state.items.filter((item) => {
     if (typeof isBrokenTitle === 'function' && isBrokenTitle(item.title)) return false;
     if (forceAll) return true;
     const missingStudio  = !item.studio || item.studio === 'Unknown Studio';
@@ -216,7 +217,7 @@ async function enrichMissingMetadata(forceAll = false) {
 
   if (targets.length === 0) {
     if (typeof showToast === 'function') {
-      showToast('All entries with valid titles already have metadata!');
+      showToast('All targeted entries already have complete metadata!');
     }
     if (typeof renderAll === 'function') renderAll();
     return;
@@ -241,7 +242,7 @@ async function enrichMissingMetadata(forceAll = false) {
     const pct   = Math.round((processed / targets.length) * 100);
     if (progressBar) progressBar.style.width = `${pct}%`;
     if (statusText) {
-      statusText.textContent = `\u26A1 Auto-filling Studio, Release Date, Genres & Synopsis (${processed} / ${targets.length})...`;
+      statusText.textContent = `⚡ [AniList] Auto-filling Studio, Release Date, Genres & Synopsis (${processed} / ${targets.length})...`;
     }
 
     const queryFields = batch.map((item, idx) => {
@@ -286,29 +287,33 @@ async function enrichMissingMetadata(forceAll = false) {
           const media = data[`q${idx}`]?.media?.[0];
           if (!media) return;
 
-          // Studio / Creator
-          const studioNodes  = media.studios?.nodes || [];
-          const animStudios  = studioNodes.filter((n) => n.isAnimationStudio).map((n) => n.name);
-          const allStudios   = studioNodes.map((n) => n.name);
+          // Studio / Creator - Deduplicated (L3)
+          const studioNodes   = media.studios?.nodes || [];
+          const animStudios   = Array.from(new Set(studioNodes.filter((n) => n.isAnimationStudio).map((n) => n.name).filter(Boolean)));
+          const allStudios    = Array.from(new Set(studioNodes.map((n) => n.name).filter(Boolean)));
           const chosenStudios = (animStudios.length > 0 ? animStudios : allStudios).slice(0, 2).join(', ');
-          if (chosenStudios && (!item.studio || item.studio === 'Unknown Studio')) {
+          
+          // Never overwrite manually edited fields (B3)
+          const edited = item._manualFields || [];
+
+          if (chosenStudios && !edited.includes('studio') && (!item.studio || item.studio === 'Unknown Studio' || forceAll)) {
             item.studio = chosenStudios;
           }
 
           // Release Date
           const rel = formatSeasonYear(media.season, media.seasonYear, media.startDate?.year);
-          if (rel !== 'TBA' && (!item.releaseDate || item.releaseDate === 'TBA')) {
+          if (rel !== 'TBA' && !edited.includes('releaseDate') && (!item.releaseDate || item.releaseDate === 'TBA' || forceAll)) {
             item.releaseDate = rel;
           }
 
           // Genres
-          if (Array.isArray(media.genres) && media.genres.length > 0 && (!item.genres || item.genres.length === 0)) {
+          if (Array.isArray(media.genres) && media.genres.length > 0 && !edited.includes('genres') && (!item.genres || item.genres.length === 0 || forceAll)) {
             item.genres = media.genres.slice(0, 4);
           }
 
           // Synopsis
           const cleanDesc = cleanHtmlSynopsis(media.description);
-          if (cleanDesc && (!item.synopsis || item.synopsis.trim() === '')) {
+          if (cleanDesc && !edited.includes('synopsis') && (!item.synopsis || item.synopsis.trim() === '' || forceAll)) {
             item.synopsis = cleanDesc;
           }
 
@@ -330,6 +335,7 @@ async function enrichMissingMetadata(forceAll = false) {
             if (item.status === 'Completed') item.progress = 1;
           }
 
+          item.updatedAt = Date.now();
           updatedCount++;
         });
 
