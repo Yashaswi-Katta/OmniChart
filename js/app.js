@@ -529,10 +529,6 @@ function openAuthModal(activeTab = 'account') {
   if (resetErr) resetErr.classList.add('hidden');
   const newPassErr = document.getElementById('authNewPasswordErrorMessage');
   if (newPassErr) newPassErr.classList.add('hidden');
-  const recoveryErr = document.getElementById('authRecoveryLinkError');
-  if (recoveryErr) recoveryErr.classList.add('hidden');
-  const recoveryInp = document.getElementById('authRecoveryLinkInput');
-  if (recoveryInp) recoveryInp.value = '';
 
   if (activeTab === 'forgot-password') {
     if (loggedInView)       loggedInView.classList.add('hidden');
@@ -2783,9 +2779,6 @@ document.addEventListener('click', async (e) => {
             <span>✉️</span> Reset Link Sent!
           </div>
           <p>We've sent a password reset link to <strong>${esc(email)}</strong>. Please check your inbox.</p>
-          <div class="mt-1.5 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
-            <span class="text-[#ff9f1c] font-semibold">💡 Localhost tip:</span> If clicking the email link opens a <code class="text-amber-300">localhost:3000</code> URL that refuses to connect, simply copy that full address from your browser bar and paste it into <strong>"Paste link here"</strong> below!
-          </div>
         `;
         successEl.classList.remove('hidden');
       }
@@ -2798,45 +2791,6 @@ document.addEventListener('click', async (e) => {
         } else {
           errEl.textContent = msg || 'Failed to send password reset email. Please try again.';
         }
-        errEl.classList.remove('hidden');
-      }
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = origText;
-    }
-  } else if (action === 'toggle-paste-token') {
-    const sec = document.getElementById('authPasteTokenSection');
-    if (sec) {
-      sec.classList.toggle('hidden');
-      if (!sec.classList.contains('hidden')) {
-        document.getElementById('authRecoveryLinkInput')?.focus();
-      }
-    }
-  } else if (action === 'auth-apply-recovery-link') {
-    const rawInput = document.getElementById('authRecoveryLinkInput')?.value?.trim();
-    const email = document.getElementById('authResetEmailInput')?.value?.trim();
-    const errEl = document.getElementById('authRecoveryLinkError');
-    if (errEl) errEl.classList.add('hidden');
-
-    if (!rawInput) {
-      if (errEl) {
-        errEl.textContent = '⚠️ Please paste a link, URL, or token.';
-        errEl.classList.remove('hidden');
-      }
-      return;
-    }
-
-    btn.disabled = true;
-    const origText = btn.innerHTML;
-    btn.textContent = 'Verifying...';
-
-    try {
-      await CloudSync.applyRecoveryUrlOrToken(rawInput, email);
-      showToast('Verified! Please choose your new password.');
-      openAuthModal('reset-password');
-    } catch (err) {
-      if (errEl) {
-        errEl.textContent = err.message || 'Failed to verify recovery token. Please check the URL and try again.';
         errEl.classList.remove('hidden');
       }
     } finally {
@@ -3272,15 +3226,6 @@ if (authConfirmPwdInp) {
   });
 }
 
-const authRecoveryLinkInp = document.getElementById('authRecoveryLinkInput');
-if (authRecoveryLinkInp) {
-  authRecoveryLinkInp.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      document.getElementById('authApplyRecoveryBtn')?.click();
-    }
-  });
-}
 
 const authModalBackdrop = document.getElementById('authModal');
 if (authModalBackdrop) {

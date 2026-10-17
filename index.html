@@ -1008,61 +1008,6 @@
                 <span>Back to Sign In</span>
               </button>
             </div>
-
-            <!-- Fallback: Paste Localhost Link or Token -->
-            <div class="pt-3 border-t border-[#3d494f]/60 space-y-2">
-              <div class="flex items-center justify-between text-xs">
-                <span class="text-slate-400 font-semibold flex items-center gap-1">
-                  <span>🔗</span> Clicked email and saw localhost?
-                </span>
-                <button
-                  type="button"
-                  data-action="toggle-paste-token"
-                  class="text-[#ff9f1c] hover:underline text-[11px] font-medium"
-                >
-                  Paste link here
-                </button>
-              </div>
-
-              <div id="authPasteTokenSection" class="p-3 rounded-xl bg-[#0d0e11] border border-[#3d494f] space-y-2.5">
-                <p class="text-[11px] text-slate-400 leading-relaxed">
-                  If clicking the email link opens <code class="text-amber-300 bg-[#2c3539] px-1 py-0.5 rounded">localhost</code> and refuses to connect, simply copy that full address from your browser (or copy the link from your email) and paste it below:
-                </p>
-                <div class="space-y-2">
-                  <input
-                    id="authRecoveryLinkInput"
-                    type="text"
-                    placeholder="Paste localhost URL, email link, or token here..."
-                    class="w-full h-8 px-2.5 rounded-lg bg-[#2c3539] border border-[#3d494f] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#ff9f1c]"
-                  />
-                  <button
-                    type="button"
-                    id="authApplyRecoveryBtn"
-                    data-action="auth-apply-recovery-link"
-                    class="w-full h-8 px-3 rounded-lg bg-[#ff9f1c] hover:bg-[#ffb144] text-[#0d0e11] font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
-                  >
-                    <span>Verify Link &amp; Set New Password</span>
-                  </button>
-                </div>
-                <div id="authRecoveryLinkError" class="hidden p-2 rounded bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300"></div>
-              </div>
-
-              <!-- Supabase Setup Tip -->
-              <details class="text-[11px] text-slate-400 group pt-1">
-                <summary class="cursor-pointer text-[#ff9f1c] hover:underline font-medium list-none flex items-center justify-between">
-                  <span>⚙️ Permanent Fix: Configure Supabase Redirect URLs</span>
-                  <span class="group-open:rotate-180 transition-transform">▾</span>
-                </summary>
-                <div class="mt-2 p-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] space-y-1.5 text-slate-300 leading-relaxed">
-                  <p>To have Supabase email links open OmniChart directly without redirecting to localhost:</p>
-                  <ol class="list-decimal list-inside space-y-1 pl-1 text-[11px]">
-                    <li>Open <a href="https://supabase.com/dashboard/project/vfwjyulubcmbiuizkwhd/auth/url-configuration" target="_blank" rel="noopener noreferrer" class="text-[#ff9f1c] underline">Supabase Authentication → URL Configuration</a>.</li>
-                    <li>Set <strong>Site URL</strong> to <code class="text-amber-300 bg-black/40 px-1 rounded">https://yashaswi-katta.github.io/OmniChart/</code> (or your active URL).</li>
-                    <li>Under <strong>Redirect URLs</strong>, add <code class="text-amber-300 bg-black/40 px-1 rounded">https://yashaswi-katta.github.io/**</code> and <code class="text-amber-300 bg-black/40 px-1 rounded">http://localhost:*/**</code>.</li>
-                  </ol>
-                </div>
-              </details>
-            </div>
           </div>
         </div>
 
@@ -1263,9 +1208,9 @@
   </nav>
 
   <!-- Modular JavaScript (load order matters: sync → api → app) -->
-  <script src="js/sync.js?v=8"></script>
-  <script src="js/api.js?v=8"></script>
-  <script src="js/app.js?v=8"></script>
+  <script src="js/sync.js?v=9"></script>
+  <script src="js/api.js?v=9"></script>
+  <script src="js/app.js?v=9"></script>
 
 </body>
 </html>
