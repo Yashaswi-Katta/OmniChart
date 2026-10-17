@@ -113,11 +113,197 @@ const OwnerMode = {
 };
 
 // ---------------------------------------------------------------------------
-// Recovery map for short anime titles that LiveChart poster overlays
-// overwrote with "TV (JP)Released"
+// Comprehensive Bilingual Anime Title Dictionary & Normalization (L7)
+// Provides instant bidirectional English <-> Romaji title resolution
 // ---------------------------------------------------------------------------
-// Recovery map for short anime titles that LiveChart poster overlays
-// overwrote with "TV (JP)Released", with English & Romaji titles (L7)
+const BILINGUAL_ANIME_MAP = [
+  // High-priority titles specifically highlighted in review & common favorites
+  { id: 'lc-takopi', english: "Takopi's Original Sin", romaji: "Takopii no Genzai", aliases: ["Takopi", "Takopi no Genzai"] },
+  { id: 'lc-aot', english: "Attack on Titan", romaji: "Shingeki no Kyojin", aliases: ["AOT", "Shingeki", "Attack on Titan: The Final Season"] },
+  { id: 'lc-frieren', english: "Frieren: Beyond Journey's End", romaji: "Sousou no Frieren", aliases: ["Frieren", "Sousou no Frieren Season 1"] },
+  { id: 'lc-demonslayer', english: "Demon Slayer: Kimetsu no Yaiba", romaji: "Kimetsu no Yaiba", aliases: ["Demon Slayer", "Kimetsu", "Kimetsu no Yaiba: Yuukaku-hen", "Kimetsu no Yaiba: Katanakaji no Sato-hen"] },
+  { id: 'lc-mha', english: "My Hero Academia", romaji: "Boku no Hero Academia", aliases: ["MHA", "My Hero", "Boku no Hero"] },
+  { id: 'lc-sololeveling', english: "Solo Leveling", romaji: "Ore dake Level Up na Ken", aliases: ["Na Honjaman Rebeleop", "Ore dake Level Up", "Solo Leveling Season 2"] },
+  { id: 'lc-silentvoice', english: "A Silent Voice", romaji: "Koe no Katachi", aliases: ["The Shape of Voice"] },
+  { id: 'lc-yourname', english: "Your Name.", romaji: "Kimi no Na wa.", aliases: ["Your Name", "Kimi no Nawa"] },
+  { id: 'lc-apothecary', english: "The Apothecary Diaries", romaji: "Kusuriya no Hitorigoto", aliases: ["Kusuriya", "The Pharmacist's Monologue"] },
+  { id: 'lc-dungeonmeshi', english: "Delicious in Dungeon", romaji: "Dungeon Meshi", aliases: ["Delicious in Dungeon"] },
+  { id: 'lc-konosuba', english: "KonoSuba: God's Blessing on This Wonderful World!", romaji: "Kono Subarashii Sekai ni Shukufuku wo!", aliases: ["KonoSuba", "Konosuba!"] },
+  { id: 'lc-rezero', english: "Re:ZERO -Starting Life in Another World-", romaji: "Re:Zero kara Hajimeru Isekai Seikatsu", aliases: ["Re:Zero", "ReZero"] },
+  { id: 'lc-slime', english: "That Time I Got Reincarnated as a Slime", romaji: "Tensei Shitara Slime Datta Ken", aliases: ["Tensura", "Slime Isekai"] },
+  { id: 'lc-mushoku', english: "Mushoku Tensei: Jobless Reincarnation", romaji: "Mushoku Tensei: Isekai Ittara Honki Dasu", aliases: ["Mushoku Tensei", "Jobless Reincarnation"] },
+  { id: 'lc-7deadly', english: "The Seven Deadly Sins", romaji: "Nanatsu no Taizai", aliases: ["Seven Deadly Sins"] },
+  { id: 'lc-kuroko', english: "Kuroko's Basketball", romaji: "Kuroko no Basket", aliases: ["The Basketball which Kuroko Plays"] },
+  { id: 'lc-shieldhero', english: "The Rising of the Shield Hero", romaji: "Tate no Yuusha no Nariagari", aliases: ["Shield Hero"] },
+  { id: 'lc-oregairu', english: "My Teen Romantic Comedy SNAFU", romaji: "Yahari Ore no Seishun Love Come wa Machigatteiru.", aliases: ["Oregairu", "SNAFU"] },
+  { id: 'lc-bunnygirl', english: "Rascal Does Not Dream of Bunny Girl Senpai", romaji: "Seishun Buta Yarou wa Bunny Girl Senpai no Yume wo Minai", aliases: ["Bunny Girl Senpai", "Aobuta"] },
+  { id: 'lc-kaguya', english: "Kaguya-sama: Love Is War", romaji: "Kaguya-sama wa Kokurasetai: Tensai-tachi no Renai Zunousen", aliases: ["Kaguya-sama", "Love is War"] },
+  { id: 'lc-komi', english: "Komi Can't Communicate", romaji: "Komi-san wa, Komyushou desu.", aliases: ["Komi-san", "Komi"] },
+  { id: 'lc-dressup', english: "My Dress-Up Darling", romaji: "Sono Bisque Doll wa Koi wo Suru", aliases: ["Bisque Doll", "Marin Kitagawa"] },
+  { id: 'lc-summertime', english: "Summer Time Rendering", romaji: "Summertime Render", aliases: ["Summer Time Render"] },
+  { id: 'lc-hellsparadise', english: "Hell's Paradise", romaji: "Jigokuraku", aliases: ["Hells Paradise"] },
+  { id: 'lc-kaiju8', english: "Kaiju No. 8", romaji: "Kaijuu 8-gou", aliases: ["Kaijuu 8-gou", "Kaiju No.8"] },
+  { id: 'lc-dandadan', english: "DAN DA DAN", romaji: "Dandadan", aliases: ["Dandadan"] },
+  { id: 'lc-chainsaw', english: "Chainsaw Man", romaji: "Chainsaw Man", aliases: ["CSM"] },
+  { id: 'lc-jujutsu', english: "JUJUTSU KAISEN", romaji: "Jujutsu Kaisen", aliases: ["JJK"] },
+  { id: 'lc-jujutsu0', english: "JUJUTSU KAISEN 0", romaji: "Gekijouban Jujutsu Kaisen 0", aliases: ["JJK 0"] },
+  { id: 'lc-bluelock', english: "BLUELOCK", romaji: "Blue Lock", aliases: ["Blue Lock"] },
+  { id: 'lc-bocchi', english: "BOCCHI THE ROCK!", romaji: "Bocchi the Rock!", aliases: ["Bocchi"] },
+  { id: 'lc-oshinoko', english: "[Oshi No Ko]", romaji: "Oshi no Ko", aliases: ["Oshi no Ko", "My Star"] },
+  { id: 'lc-spyfamily', english: "SPY x FAMILY", romaji: "SPY x FAMILY", aliases: ["Spy Family", "Spy x Family"] },
+  { id: 'lc-vinland', english: "Vinland Saga", romaji: "Vinland Saga", aliases: [] },
+  { id: 'lc-cyberpunk', english: "Cyberpunk: Edgerunners", romaji: "Cyberpunk: Edgerunners", aliases: ["Edgerunners"] },
+  { id: 'lc-fireforce', english: "Fire Force", romaji: "Enen no Shouboutai", aliases: ["Enen no Shouboutai"] },
+  { id: 'lc-drstone', english: "Dr. STONE", romaji: "Dr. Stone", aliases: ["Doctor Stone"] },
+  { id: 'lc-blueexorcist', english: "Blue Exorcist", romaji: "Ao no Exorcist", aliases: ["Ao no Exorcist"] },
+  { id: 'lc-noragami', english: "Noragami: Stray God", romaji: "Noragami", aliases: ["Stray God"] },
+  { id: 'lc-erased', english: "ERASED", romaji: "Boku dake ga Inai Machi", aliases: ["The Town Where Only I am Missing"] },
+  { id: 'lc-yourlie', english: "Your Lie in April", romaji: "Shigatsu wa Kimi no Uso", aliases: ["Kimiuso"] },
+  { id: 'lc-anohana', english: "Anohana: The Flower We Saw That Day", romaji: "Ano Hi Mita Hana no Namae wo Bokutachi wa Mada Shiranai.", aliases: ["Anohana"] },
+  { id: 'lc-assclass', english: "Assassination Classroom", romaji: "Ansatsu Kyoushitsu", aliases: ["Ansatsu"] },
+  { id: 'lc-neverland', english: "The Promised Neverland", romaji: "Yakusoku no Neverland", aliases: ["Yakusoku"] },
+  { id: 'lc-codegeass', english: "Code Geass: Lelouch of the Rebellion", romaji: "Code Geass: Hangyaku no Lelouch", aliases: ["Code Geass", "Lelouch"] },
+  { id: 'lc-fma', english: "Fullmetal Alchemist: Brotherhood", romaji: "Hagane no Renkinjutsushi: Fullmetal Alchemist", aliases: ["FMAB", "Fullmetal Alchemist"] },
+  { id: 'lc-parasyte', english: "Parasyte -the maxim-", romaji: "Kiseijuu: Sei no Kakuritsu", aliases: ["Parasyte", "Kiseijuu"] },
+  { id: 'lc-tokyoghoul', english: "Tokyo Ghoul", romaji: "Tokyo Ghoul", aliases: [] },
+  { id: 'lc-steinsgate', english: "Steins;Gate", romaji: "Steins;Gate", aliases: ["Steins Gate"] },
+  { id: 'lc-hxh', english: "Hunter x Hunter", romaji: "Hunter x Hunter (2011)", aliases: ["HxH"] },
+  { id: 'lc-haikyu', english: "Haikyu!!", romaji: "Haikyuu!!", aliases: ["Haikyu"] },
+  { id: 'lc-mobpsycho', english: "Mob Psycho 100", romaji: "Mob Psycho 100", aliases: ["Mob"] },
+  { id: 'lc-onepunch', english: "One-Punch Man", romaji: "One Punch Man", aliases: ["OPM"] },
+  { id: 'lc-deathnote', english: "Death Note", romaji: "Death Note", aliases: [] },
+  { id: 'lc-bleach', english: "Bleach", romaji: "Bleach", aliases: [] },
+  { id: 'lc-bleachtybw', english: "Bleach: Thousand-Year Blood War", romaji: "Bleach: Sennen Kessen-hen", aliases: ["Bleach TYBW"] },
+  { id: 'lc-naruto', english: "Naruto", romaji: "Naruto", aliases: ["Naruto Shippuden"] },
+  { id: 'lc-onepiece', english: "One Piece", romaji: "One Piece", aliases: [] },
+  { id: 'lc-dbz', english: "Dragon Ball Z", romaji: "Dragon Ball Z", aliases: ["DBZ"] },
+  { id: 'lc-blackclover', english: "Black Clover", romaji: "Black Clover", aliases: [] },
+  { id: 'lc-blacklagoon', english: "Black Lagoon", romaji: "Black Lagoon", aliases: [] },
+  { id: 'lc-cowboybebop', english: "Cowboy Bebop", romaji: "Cowboy Bebop", aliases: [] },
+  { id: 'lc-dororo', english: "Dororo", romaji: "Dororo", aliases: [] },
+  { id: 'lc-psychopass', english: "PSYCHO-PASS", romaji: "Psycho-Pass", aliases: [] },
+  { id: 'lc-goblinslayer', english: "Goblin Slayer", romaji: "Goblin Slayer", aliases: [] },
+  { id: 'lc-drifters', english: "Drifters", romaji: "Drifters", aliases: [] },
+  { id: 'lc-windbreaker', english: "WIND BREAKER", romaji: "Wind Breaker", aliases: [] },
+  { id: 'lc-chainedsoldier', english: "Chained Soldier", romaji: "Mato Seihei no Slave", aliases: [] },
+  { id: 'lc-loserranger', english: "Go! Go! Loser Ranger!", romaji: "Sentai Daishikkaku", aliases: [] },
+  { id: 'lc-ragnarok', english: "Record of Ragnarok", romaji: "Shuumatsu no Valkyrie", aliases: [] },
+  { id: 'lc-bakihanma', english: "Baki Hanma", romaji: "Hanma Baki", aliases: [] },
+  { id: 'lc-modaozushi', english: "The Founder of Diabolism", romaji: "Mo Dao Zu Shi", aliases: ["Grandmaster of Demonic Cultivation"] },
+  { id: 'lc-scissor7', english: "Scissor Seven", romaji: "Cike Wu Liuqi", aliases: ["Killer 7"] },
+  { id: 'lc-jojo6', english: "JoJo's Bizarre Adventure: Stone Ocean", romaji: "JoJo no Kimyou na Bouken: Stone Ocean", aliases: ["Stone Ocean"] },
+  { id: 'lc-horimiya', english: "Horimiya", romaji: "Horimiya", aliases: ["Hori-san to Miyamura-kun"] },
+  { id: 'lc-idinvaded', english: "ID: INVADED", romaji: "Id:Invaded", aliases: [] },
+  { id: 'lc-charlotte', english: "Charlotte", romaji: "Charlotte", aliases: [] },
+  { id: 'lc-deathparade', english: "Death Parade", romaji: "Death Parade", aliases: [] },
+  { id: 'lc-devilman', english: "DEVILMAN crybaby", romaji: "Devilman Crybaby", aliases: [] },
+  { id: 'lc-elfenlied', english: "Elfen Lied", romaji: "Elfen Lied", aliases: [] },
+  { id: 'lc-gurrenlagann', english: "Gurren Lagann", romaji: "Tengen Toppa Gurren Lagann", aliases: ["TTGL"] },
+  { id: 'lc-overlord', english: "Overlord", romaji: "Overlord", aliases: [] },
+  { id: 'lc-plasticmemories', english: "Plastic Memories", romaji: "Plastic Memories", aliases: [] },
+  { id: 'lc-akamegakill', english: "Akame ga Kill!", romaji: "Akame ga Kill!", aliases: [] },
+  { id: 'lc-futurediary', english: "The Future Diary", romaji: "Mirai Nikki", aliases: ["Future Diary"] },
+  { id: 'lc-dragonraja', english: "Dragon Raja", romaji: "Long Zu", aliases: [] },
+  { id: 'lc-undeadunluck', english: "Undead Unluck", romaji: "Undead Unluck", aliases: [] },
+  { id: 'lc-sakamoto', english: "SAKAMOTO DAYS", romaji: "Sakamoto Days", aliases: [] },
+  { id: 'lc-gachiakuta', english: "Gachiakuta", romaji: "Gachiakuta", aliases: [] },
+  { id: 'lc-zenshu', english: "ZENSHU", romaji: "Zenshuu.", aliases: [] },
+  { id: 'lc-tougenanki', english: "Tougen Anki", romaji: "Tougen Anki", aliases: [] },
+  { id: 'lc-ninjakamui', english: "Ninja Kamui", romaji: "Ninja Kamui", aliases: [] },
+  { id: 'lc-kenganashura', english: "Kengan Ashura", romaji: "Kengan Ashura", aliases: [] },
+  { id: 'lc-kakegurui', english: "Kakegurui", romaji: "Kakegurui", aliases: [] },
+  { id: 'lc-shinsekai', english: "From the New World", romaji: "Shinsekai yori", aliases: ["Shin Sekai Yori"] },
+  { id: 'lc-madoka', english: "Puella Magi Madoka Magica", romaji: "Mahou Shoujo Madoka★Magica", aliases: ["Madoka Magica"] },
+  { id: 'lc-killlakill', english: "Kill la Kill", romaji: "Kill la Kill", aliases: [] },
+  { id: 'lc-violet', english: "Violet Evergarden", romaji: "Violet Evergarden", aliases: [] },
+  { id: 'lc-fatezero', english: "Fate/Zero", romaji: "Fate/Zero", aliases: [] },
+  { id: 'lc-fatestay', english: "Fate/stay night: Unlimited Blade Works", romaji: "Fate/stay night: Unlimited Blade Works", aliases: ["UBW"] },
+  { id: 'lc-sao', english: "Sword Art Online", romaji: "Sword Art Online", aliases: ["SAO"] },
+  { id: 'lc-evangelion', english: "Neon Genesis Evangelion", romaji: "Shin Seiki Evangelion", aliases: ["Evangelion", "NGE"] },
+  { id: 'lc-toradora', english: "Toradora!", romaji: "Toradora!", aliases: ["Toradora"] },
+  { id: 'lc-clannad', english: "Clannad: After Story", romaji: "Clannad: After Story", aliases: ["Clannad"] },
+  { id: 'lc-tokyorevengers', english: "Tokyo Revengers", romaji: "Tokyo Revengers", aliases: [] },
+  { id: 'lc-86', english: "86: Eighty Six", romaji: "86: Eighty Six", aliases: ["86", "Eighty Six"] },
+  { id: 'lc-vivy', english: "Vivy: Fluorite Eye's Song", romaji: "Vivy: Fluorite Eye's Song", aliases: ["Vivy"] },
+  { id: 'lc-lycoris', english: "Lycoris Recoil", romaji: "Lycoris Recoil", aliases: [] },
+  { id: 'lc-rentagirlfriend', english: "Rent-a-Girlfriend", romaji: "Kanojo, Okarishimasu", aliases: ["Kanokari"] },
+  { id: 'lc-tonikawa', english: "TONIKAWA: Over The Moon For You", romaji: "Tonikaku Kawaii", aliases: ["Fly Me to the Moon"] },
+  { id: 'lc-cote', english: "Classroom of the Elite", romaji: "Youkoso Jitsuryoku Shijou Shugi no Kyoushitsu e", aliases: ["CotE", "Youkoso Jitsuryoku", "You-Zitsu"] },
+  { id: 'lc-eminence', english: "The Eminence in Shadow", romaji: "Kage no Jitsuryokusha ni Naritakute!", aliases: ["Eminence in Shadow", "Kage no Jitsuryokusha"] },
+  { id: 'lc-ngnl', english: "No Game, No Life", romaji: "No Game No Life", aliases: ["NGNL"] },
+  { id: 'lc-makeine', english: "Makeine: Too Many Losing Heroines!", romaji: "Make Heroine ga Oosugiru!", aliases: ["Makeine", "Too Many Losing Heroines"] },
+  { id: 'lc-roshidere', english: "Alya Sometimes Hides Her Feelings in Russian", romaji: "Tokidoki Bosotto Russia-go de Dereru Tonari no Alya-san", aliases: ["Roshidere", "Alya-san"] },
+  { id: 'lc-shanfro', english: "Shangri-La Frontier", romaji: "Shangri-La Frontier", aliases: ["ShanFro"] },
+  { id: 'lc-wistoria', english: "Wistoria: Wand and Sword", romaji: "Tsue to Tsurugi no Wistoria", aliases: ["Wistoria"] },
+  { id: 'lc-mushishi', english: "Mushi-Shi", romaji: "Mushishi", aliases: ["Mushishi"] },
+  { id: 'lc-bakemonogatari', english: "Bakemonogatari", romaji: "Bakemonogatari", aliases: ["Monogatari", "Kizumonogatari", "Nisemonogatari"] },
+  { id: 'lc-gto', english: "Great Teacher Onizuka", romaji: "Great Teacher Onizuka", aliases: ["GTO"] },
+  { id: 'lc-berserk', english: "Berserk", romaji: "Kenpuu Denki Berserk", aliases: ["Berserk 1997"] },
+  { id: 'lc-jojo', english: "JoJo's Bizarre Adventure", romaji: "JoJo no Kimyou na Bouken", aliases: ["JoJo", "JJBA", "Stardust Crusaders", "Diamond is Unbreakable", "Golden Wind"] },
+  { id: 'lc-madeinabyss', english: "Made in Abyss", romaji: "Made in Abyss", aliases: ["Made in Abyss: The Golden City of the Scorching Sun"] },
+  { id: 'lc-dorohedoro', english: "Dorohedoro", romaji: "Dorohedoro", aliases: [] },
+  { id: 'lc-goldenkamuy', english: "Golden Kamuy", romaji: "Golden Kamuy", aliases: [] },
+  { id: 'lc-durarara', english: "Durarara!!", romaji: "Durarara!!", aliases: ["DRRR"] },
+  { id: 'lc-baccano', english: "Baccano!", romaji: "Baccano!", aliases: [] },
+  { id: 'lc-samuraichamploo', english: "Samurai Champloo", romaji: "Samurai Champloo", aliases: ["Champloo"] },
+  { id: 'lc-trigun', english: "Trigun", romaji: "Trigun", aliases: ["Trigun Stampede"] },
+  { id: 'lc-hellsing', english: "Hellsing Ultimate", romaji: "Hellsing Ultimate", aliases: ["Hellsing"] },
+  { id: 'lc-souleater', english: "Soul Eater", romaji: "Soul Eater", aliases: [] },
+  { id: 'lc-dgrayman', english: "D.Gray-man", romaji: "D.Gray-man", aliases: ["D Gray Man"] },
+  { id: 'lc-relife', english: "ReLIFE", romaji: "ReLIFE", aliases: [] },
+  { id: 'lc-gintama', english: "Gintama", romaji: "Gintama", aliases: [] },
+  { id: 'lc-monster', english: "Monster", romaji: "Monster", aliases: ["Naoki Urasawa's Monster"] }
+];
+
+function normalizeTitleKey(str) {
+  if (!str) return '';
+  return String(str)
+    .toLowerCase()
+    .replace(/\s*\(?(?:TV|Movie|ONA|OVA|Special|Dub|Sub|Subbed|Dubbed)\)?/gi, '')
+    .replace(/\s*[-:]?\s*\(?(?:Season\s*\d+|2nd\s*Season|3rd\s*Season|4th\s*Season|Final\s*Season|Part\s*\d+|Cour\s*\d+)\)?/gi, '')
+    .replace(/[^\w]/g, '')
+    .trim();
+}
+
+const BILINGUAL_ANIME_INDEX = new Map();
+for (const entry of BILINGUAL_ANIME_MAP) {
+  if (entry.id) BILINGUAL_ANIME_INDEX.set(entry.id.toLowerCase(), entry);
+  if (entry.english) BILINGUAL_ANIME_INDEX.set(normalizeTitleKey(entry.english), entry);
+  if (entry.romaji) BILINGUAL_ANIME_INDEX.set(normalizeTitleKey(entry.romaji), entry);
+  for (const alias of entry.aliases || []) {
+    BILINGUAL_ANIME_INDEX.set(normalizeTitleKey(alias), entry);
+  }
+}
+
+/** Look up canonical bilingual titles for any anime query, title, or ID */
+function lookupBilingualTitle(query) {
+  if (!query) return null;
+  const raw = String(query).trim().toLowerCase();
+  if (BILINGUAL_ANIME_INDEX.has(raw)) return BILINGUAL_ANIME_INDEX.get(raw);
+  const key = normalizeTitleKey(query);
+  if (key && BILINGUAL_ANIME_INDEX.has(key)) {
+    const base = BILINGUAL_ANIME_INDEX.get(key);
+    // If query has a season or part suffix (e.g. "Season 2"), preserve suffix
+    const seasonMatch = String(query).match(/\b(Season\s*\d+|2nd\s*Season|3rd\s*Season|4th\s*Season|Final\s*Season|Part\s*\d+|Cour\s*\d+)\b/i);
+    if (seasonMatch && base) {
+      const suffix = seasonMatch[1];
+      const hasEngSuffix = base.english.toLowerCase().includes(suffix.toLowerCase());
+      const hasRomSuffix = base.romaji.toLowerCase().includes(suffix.toLowerCase());
+      return {
+        id: base.id,
+        english: hasEngSuffix ? base.english : `${base.english} ${suffix}`,
+        romaji: hasRomSuffix ? base.romaji : `${base.romaji} ${suffix}`
+      };
+    }
+    return base;
+  }
+  return null;
+}
+window.lookupBilingualTitle = lookupBilingualTitle;
+window.BILINGUAL_ANIME_MAP = BILINGUAL_ANIME_MAP;
+
+// ---------------------------------------------------------------------------
+// Recovery map for legacy LiveChart IDs
 // ---------------------------------------------------------------------------
 const LIVECHART_ID_TITLE_RECOVERY = {
   'lc-321':   { title: 'One Piece', english: 'One Piece', romaji: 'One Piece' },
@@ -156,7 +342,7 @@ const LIVECHART_ID_TITLE_RECOVERY = {
   'lc-10281': { title: 'Record of Ragnarok', english: 'Record of Ragnarok', romaji: 'Shuumatsu no Valkyrie' },
   'lc-10754': { title: 'Record of Ragnarok II', english: 'Record of Ragnarok II', romaji: 'Shuumatsu no Valkyrie II' },
   'lc-13083': { title: 'Record of Ragnarok III', english: 'Record of Ragnarok III', romaji: 'Shuumatsu no Valkyrie III' },
-  'lc-11088': { title: 'Baki Hanma', english: 'Baki Hanma', romaji: 'Hanma Baki: Son of Ogre' },
+  'lc-11088': { title: 'Baki Hanma', english: 'Baki Hanma', romaji: 'Hanma Baki' },
   'lc-11380': { title: 'Baki Hanma Season 2', english: 'Baki Hanma Season 2', romaji: 'Hanma Baki 2nd Season' },
   'lc-4603':  { title: 'Mo Dao Zu Shi', english: 'The Founder of Diabolism', romaji: 'Mo Dao Zu Shi' },
   'lc-10083': { title: 'Scissor Seven Season 2', english: 'Scissor Seven Season 2', romaji: 'Cike Wu Liuqi 2nd Season' },
@@ -182,7 +368,7 @@ const LIVECHART_ID_TITLE_RECOVERY = {
   'lc-12917': { title: 'SAKAMOTO DAYS', english: 'Sakamoto Days', romaji: 'Sakamoto Days' },
   'lc-12697': { title: 'Gachiakuta', english: 'Gachiakuta', romaji: 'Gachiakuta' },
   'lc-12601': { title: 'ZENSHU', english: 'Zenshu.', romaji: 'Zenshuu.' },
-  'lc-12651': { title: 'Tougen Anki', english: 'Tougen Anki: Dark Demon of Tougen', romaji: 'Tougen Anki' },
+  'lc-12651': { title: 'Tougen Anki', english: 'Tougen Anki', romaji: 'Tougen Anki' },
   'lc-11225': { title: 'Ninja Kamui', english: 'Ninja Kamui', romaji: 'Ninja Kamui' },
   'lc-9563':  { title: 'Kengan Ashura', english: 'Kengan Ashura', romaji: 'Kengan Ashura' },
   'lc-1580':  { title: 'Kakegurui', english: 'Kakegurui', romaji: 'Kakegurui' }
@@ -216,26 +402,39 @@ function sanitizeAndRecoverItems(list) {
       item.consumedDate = '';
       changed = true;
     }
-    // Recover known broken LiveChart titles and supply English / Romaji titles (L7)
-    if (LIVECHART_ID_TITLE_RECOVERY[item.id]) {
-      const rec = LIVECHART_ID_TITLE_RECOVERY[item.id];
-      const recTitle = (typeof rec === 'object' && rec.title) ? rec.title : rec;
-      const recEng   = (typeof rec === 'object' && rec.english) ? rec.english : '';
-      const recRom   = (typeof rec === 'object' && rec.romaji) ? rec.romaji : '';
 
-      if (isBrokenTitle(item.title) && recTitle) {
-        item.title = recTitle;
+    // Recover known broken LiveChart titles
+    const rec = LIVECHART_ID_TITLE_RECOVERY[item.id];
+    if (rec && isBrokenTitle(item.title)) {
+      item.title = (typeof rec === 'object' && rec.title) ? rec.title : rec;
+      changed = true;
+    }
+
+    // Supply English / Romaji titles (L7) by title lookup or ID lookup
+    const match = (typeof lookupBilingualTitle === 'function')
+      ? (lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id))
+      : null;
+
+    if (match) {
+      if (match.english && !item.titleEnglish) {
+        item.titleEnglish = match.english;
         changed = true;
       }
-      if (recEng && !item.titleEnglish) {
-        item.titleEnglish = recEng;
+      if (match.romaji && !item.titleRomaji) {
+        item.titleRomaji = match.romaji;
         changed = true;
       }
-      if (recRom && !item.titleRomaji) {
-        item.titleRomaji = recRom;
+    } else if (rec && typeof rec === 'object') {
+      if (rec.english && !item.titleEnglish) {
+        item.titleEnglish = rec.english;
+        changed = true;
+      }
+      if (rec.romaji && !item.titleRomaji) {
+        item.titleRomaji = rec.romaji;
         changed = true;
       }
     }
+
     // Normalize status names: Watching -> Ongoing, Plan to Watch -> Planning
     const norm = normalizeStatus(item.status);
     if (norm !== item.status) {

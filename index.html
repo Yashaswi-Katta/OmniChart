@@ -113,6 +113,15 @@
             <div class="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-[#3d494f]/60 flex items-center justify-between">
               <span>Data &amp; Tools</span>
             </div>
+            <!-- Title Language Toggle in Logo Dropdown (L7) -->
+            <button
+              data-action="toggle-title-lang"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#364146] transition"
+              title="Toggle anime display titles between English and Romaji"
+            >
+              <span class="flex items-center gap-2"><span>🌐</span> Title Language</span>
+              <span id="menuTitleLangBadge" class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#0d0e11] text-[#ff9f1c] font-bold">English</span>
+            </button>
             <button
               data-action="open-auth-modal"
               class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-sky-300 hover:bg-sky-500/15 transition"
@@ -576,6 +585,34 @@
               <div id="duplicateTitleWarning" class="hidden text-[11px] text-amber-400 mt-1 flex items-center gap-1 font-medium">
                 <span>⚠️</span>
                 <span>A title with this name is already in your library</span>
+              </div>
+            </div>
+
+            <!-- Bilingual English & Romaji Titles (L7) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1 flex items-center justify-between">
+                  <span>English Title</span>
+                  <span class="text-[9px] text-[#ff9f1c] font-mono font-bold">EN</span>
+                </label>
+                <input
+                  id="fieldTitleEnglish"
+                  type="text"
+                  placeholder="e.g. Attack on Titan"
+                  class="w-full h-8 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#ff9f1c]"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1 flex items-center justify-between">
+                  <span>Romaji / Original</span>
+                  <span class="text-[9px] text-[#ff9f1c] font-mono font-bold">JA</span>
+                </label>
+                <input
+                  id="fieldTitleRomaji"
+                  type="text"
+                  placeholder="e.g. Shingeki no Kyojin"
+                  class="w-full h-8 px-2.5 rounded-lg bg-[#0d0e11] border border-[#3d494f] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#ff9f1c]"
+                />
               </div>
             </div>
 

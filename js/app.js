@@ -130,11 +130,22 @@ state.expandedSynopses = state.expandedSynopses || new Set();
 /** Get display title according to English / Romaji toggle (L7) */
 function getItemTitle(item) {
   if (!item) return '';
-  if (state.titleLang === 'english' && item.titleEnglish && item.titleEnglish.trim()) {
+  const lang = state.titleLang || 'english';
+  if (lang === 'english' && item.titleEnglish && item.titleEnglish.trim()) {
     return item.titleEnglish.trim();
   }
-  if (state.titleLang === 'romaji' && item.titleRomaji && item.titleRomaji.trim()) {
+  if (lang === 'romaji' && item.titleRomaji && item.titleRomaji.trim()) {
     return item.titleRomaji.trim();
+  }
+  // Instant fallback to canonical bilingual dictionary or LiveChart recovery
+  if (typeof lookupBilingualTitle === 'function') {
+    const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
+    if (match) {
+      if (match.english && !item.titleEnglish) item.titleEnglish = match.english;
+      if (match.romaji && !item.titleRomaji) item.titleRomaji = match.romaji;
+      if (lang === 'english' && match.english) return match.english;
+      if (lang === 'romaji' && match.romaji) return match.romaji;
+    }
   }
   return item.title || '';
 }
@@ -167,8 +178,15 @@ function getFilteredItems() {
       if (itemStatus !== state.status) return false;
     }
     if (q) {
-      const eng = item.titleEnglish || '';
-      const rom = item.titleRomaji || '';
+      let eng = item.titleEnglish || '';
+      let rom = item.titleRomaji || '';
+      if ((!eng || !rom) && typeof lookupBilingualTitle === 'function') {
+        const m = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
+        if (m) {
+          if (!eng && m.english) eng = m.english;
+          if (!rom && m.romaji) rom = m.romaji;
+        }
+      }
       const hay = `${item.title} ${eng} ${rom} ${item.studio || ''} ${(item.genres || []).join(' ')} ${item.consumedDate || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
@@ -361,6 +379,8 @@ function renderNavigation() {
   const langText  = document.getElementById('titleLangText');
   if (langBadge) langBadge.textContent = state.titleLang === 'romaji' ? 'JA' : 'EN';
   if (langText)  langText.textContent  = state.titleLang === 'romaji' ? 'Romaji' : 'English';
+  const menuLangBadge = document.getElementById('menuTitleLangBadge');
+  if (menuLangBadge) menuLangBadge.textContent = state.titleLang === 'romaji' ? 'Romaji' : 'English';
 
   const gridBtn = document.getElementById('densityGridBtn');
   const listBtn = document.getElementById('densityListBtn');
@@ -1786,10 +1806,29 @@ function openMediaModal(item = null, presetDate = '') {
   state.currentModalTitleEnglish = item?.titleEnglish || '';
   state.currentModalTitleRomaji  = item?.titleRomaji || '';
 
+  if (item && (!state.currentModalTitleEnglish || !state.currentModalTitleRomaji) && typeof lookupBilingualTitle === 'function') {
+    const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
+    if (match) {
+      if (!state.currentModalTitleEnglish && match.english) state.currentModalTitleEnglish = match.english;
+      if (!state.currentModalTitleRomaji && match.romaji) state.currentModalTitleRomaji = match.romaji;
+    }
+  }
+
+  const fieldTitleEnglish = document.getElementById('fieldTitleEnglish');
+  const fieldTitleRomaji  = document.getElementById('fieldTitleRomaji');
+
   if (item) {
     document.getElementById('modalTitle').textContent     = 'Edit Media';
     document.getElementById('fieldId').value              = item.id;
     document.getElementById('fieldTitle').value            = item.title || '';
+    if (fieldTitleEnglish) {
+      fieldTitleEnglish.value = state.currentModalTitleEnglish || '';
+      delete fieldTitleEnglish.dataset.userEdited;
+    }
+    if (fieldTitleRomaji) {
+      fieldTitleRomaji.value = state.currentModalTitleRomaji || '';
+      delete fieldTitleRomaji.dataset.userEdited;
+    }
     document.getElementById('fieldCategory').value         = catVal;
     updateCategoryAwareFormFields();
     document.getElementById('fieldStatus').value           = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : (item.status || 'Ongoing');
@@ -1810,6 +1849,14 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('modalTitle').textContent     = 'Add Media';
     document.getElementById('fieldId').value              = '';
     document.getElementById('fieldTitle').value            = '';
+    if (fieldTitleEnglish) {
+      fieldTitleEnglish.value = '';
+      delete fieldTitleEnglish.dataset.userEdited;
+    }
+    if (fieldTitleRomaji) {
+      fieldTitleRomaji.value = '';
+      delete fieldTitleRomaji.dataset.userEdited;
+    }
     document.getElementById('fieldCategory').value         = catVal;
     updateCategoryAwareFormFields();
     document.getElementById('fieldStatus').value           = 'Ongoing';
@@ -1924,8 +1971,19 @@ function saveMediaFromModal() {
   if (genres.length > 0) manualFields.add('genres');
   if (document.getElementById('fieldSynopsis').value.trim()) manualFields.add('synopsis');
 
-  const titleEnglish = state.currentModalTitleEnglish || existingItem?.titleEnglish || '';
-  const titleRomaji  = state.currentModalTitleRomaji  || existingItem?.titleRomaji  || '';
+  const fieldEngEl = document.getElementById('fieldTitleEnglish');
+  const fieldRomEl = document.getElementById('fieldTitleRomaji');
+  let titleEnglish = (fieldEngEl ? fieldEngEl.value.trim() : '') || state.currentModalTitleEnglish || existingItem?.titleEnglish || '';
+  let titleRomaji  = (fieldRomEl ? fieldRomEl.value.trim() : '') || state.currentModalTitleRomaji  || existingItem?.titleRomaji  || '';
+
+  // Auto-resolve bilingual titles from dictionary if still missing
+  if ((!titleEnglish || !titleRomaji) && typeof lookupBilingualTitle === 'function') {
+    const match = lookupBilingualTitle(title) || lookupBilingualTitle(id);
+    if (match) {
+      if (!titleEnglish && match.english) titleEnglish = match.english;
+      if (!titleRomaji && match.romaji) titleRomaji = match.romaji;
+    }
+  }
 
   const entry = {
     id,
@@ -2097,6 +2155,30 @@ document.addEventListener('click', async (e) => {
   } else if (action === 'toggle-title-lang') {
     state.titleLang = state.titleLang === 'romaji' ? 'english' : 'romaji';
     try { localStorage.setItem('omnichart_title_lang', state.titleLang); } catch (e) {}
+
+    // Self-healing pass: resolve any items missing English or Romaji titles
+    let healed = false;
+    if (typeof lookupBilingualTitle === 'function') {
+      for (const item of state.items) {
+        if (!item.titleEnglish || !item.titleRomaji) {
+          const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
+          if (match) {
+            if (!item.titleEnglish && match.english) { item.titleEnglish = match.english; healed = true; }
+            if (!item.titleRomaji && match.romaji) { item.titleRomaji = match.romaji; healed = true; }
+          }
+        }
+      }
+    }
+    if (healed && typeof saveItems === 'function') {
+      saveItems();
+    }
+
+    // If any items are still missing English or Romaji titles, kick off background enrichment
+    const missingLangCount = state.items.filter((i) => !i.titleEnglish || !i.titleRomaji).length;
+    if (missingLangCount > 0 && typeof enrichMissingMetadata === 'function' && !state.enrichRunning) {
+      enrichMissingMetadata(false);
+    }
+
     renderNavigation();
     renderAll();
     showToast(`Display titles: ${state.titleLang === 'romaji' ? 'Romaji' : 'English'}`);
@@ -2240,9 +2322,28 @@ document.addEventListener('click', async (e) => {
       state.currentModalTitleEnglish = r.titleEnglish || '';
       state.currentModalTitleRomaji  = r.titleRomaji || '';
 
+      if ((!state.currentModalTitleEnglish || !state.currentModalTitleRomaji) && typeof lookupBilingualTitle === 'function') {
+        const match = lookupBilingualTitle(r.title) || lookupBilingualTitle(r.titleEnglish) || lookupBilingualTitle(r.titleRomaji);
+        if (match) {
+          if (!state.currentModalTitleEnglish && match.english) state.currentModalTitleEnglish = match.english;
+          if (!state.currentModalTitleRomaji && match.romaji) state.currentModalTitleRomaji = match.romaji;
+        }
+      }
+
+      const fieldEng = document.getElementById('fieldTitleEnglish');
+      const fieldRom = document.getElementById('fieldTitleRomaji');
+      if (fieldEng) {
+        fieldEng.value = state.currentModalTitleEnglish || '';
+        delete fieldEng.dataset.userEdited;
+      }
+      if (fieldRom) {
+        fieldRom.value = state.currentModalTitleRomaji || '';
+        delete fieldRom.dataset.userEdited;
+      }
+
       const chosenTitle = (state.titleLang === 'romaji')
-        ? (r.titleRomaji || r.titleEnglish || r.title || '')
-        : (r.titleEnglish || r.titleRomaji || r.title || '');
+        ? (state.currentModalTitleRomaji || state.currentModalTitleEnglish || r.title || '')
+        : (state.currentModalTitleEnglish || state.currentModalTitleRomaji || r.title || '');
 
       document.getElementById('fieldTitle').value      = chosenTitle;
       document.getElementById('fieldCategory').value   = r.category || 'Series & Anime';
@@ -2856,12 +2957,41 @@ if (modalStatusSelect) {
   });
 }
 
-// Duplicate title detection on input (F11)
+// Duplicate title detection on input (F11) + Bilingual title auto-fill (L7)
 const modalTitleInput = document.getElementById('fieldTitle');
 if (modalTitleInput) {
   modalTitleInput.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
     const curId = document.getElementById('fieldId')?.value || '';
-    checkDuplicateTitle(e.target.value, curId);
+    checkDuplicateTitle(val, curId);
+
+    if (val && typeof lookupBilingualTitle === 'function') {
+      const match = lookupBilingualTitle(val);
+      if (match) {
+        const fieldEng = document.getElementById('fieldTitleEnglish');
+        const fieldRom = document.getElementById('fieldTitleRomaji');
+        if (fieldEng && !fieldEng.dataset.userEdited && match.english) {
+          fieldEng.value = match.english;
+        }
+        if (fieldRom && !fieldRom.dataset.userEdited && match.romaji) {
+          fieldRom.value = match.romaji;
+        }
+      }
+    }
+  });
+}
+
+// Track user-edited status for English & Romaji inputs
+const fieldTitleEngEl = document.getElementById('fieldTitleEnglish');
+if (fieldTitleEngEl) {
+  fieldTitleEngEl.addEventListener('input', () => {
+    fieldTitleEngEl.dataset.userEdited = 'true';
+  });
+}
+const fieldTitleRomEl = document.getElementById('fieldTitleRomaji');
+if (fieldTitleRomEl) {
+  fieldTitleRomEl.addEventListener('input', () => {
+    fieldTitleRomEl.dataset.userEdited = 'true';
   });
 }
 
