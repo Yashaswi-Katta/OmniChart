@@ -304,6 +304,7 @@ function openAuthModal(activeTab = 'account') {
     if (sqlEl)  sqlEl.textContent = CloudSync.getSqlSchema();
   }
 }
+window.openAuthModal = openAuthModal;
 
 function switchAuthTab(tab) {
   state.authTab = tab;
@@ -1251,7 +1252,7 @@ function openConfirmModal(title, message, onConfirm) {
 // Central Event Delegation
 // ---------------------------------------------------------------------------
 
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   const btn      = e.target.closest('[data-action]');
   const dropdown = document.getElementById('tomeDropdown');
   if (!e.target.closest('#tomeMenuBtn') && !e.target.closest('#tomeDropdown') && dropdown) {

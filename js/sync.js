@@ -668,3 +668,6 @@ CREATE POLICY "Users can delete own items"
 ALTER PUBLICATION supabase_realtime ADD TABLE public.omnichart_items;`;
   }
 };
+
+window.CloudSync = CloudSync;
+window.OwnerMode = OwnerMode;
