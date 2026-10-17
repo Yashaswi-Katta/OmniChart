@@ -1578,36 +1578,83 @@ document.addEventListener('click', (e) => {
   } else if (action === 'switch-auth-tab') {
     switchAuthTab(btn.dataset.tab);
   } else if (action === 'auth-sign-in') {
-    const email = document.getElementById('authEmailInput')?.value;
-    const pwd   = document.getElementById('authPasswordInput')?.value;
+    const email = document.getElementById('authEmailInput')?.value?.trim();
+    const pwd   = document.getElementById('authPasswordInput')?.value?.trim();
     const errEl = document.getElementById('authErrorMessage');
     if (!email || !pwd) {
-      if (errEl) { errEl.textContent = 'Please enter both email and password.'; errEl.classList.remove('hidden'); }
+      if (errEl) {
+        errEl.className = 'p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300';
+        errEl.innerHTML = '⚠️ Please enter both email and password.';
+        errEl.classList.remove('hidden');
+      }
       return;
     }
     btn.disabled = true;
     const origText = btn.innerHTML;
     btn.textContent = 'Signing In...';
     try {
-      await CloudSync.signIn(email, pwd);
+      const data = await CloudSync.signIn(email, pwd);
+      if (data?.user) {
+        state.user = data.user;
+        renderAuthStatus();
+      }
       document.getElementById('authModal').classList.add('hidden');
       showToast(`Signed in as ${email}`);
     } catch (err) {
-      if (errEl) { errEl.textContent = err.message || 'Failed to sign in'; errEl.classList.remove('hidden'); }
+      if (errEl) {
+        errEl.className = 'p-3 rounded-lg bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300 space-y-1.5';
+        const msg = err.message || '';
+        const code = err.error_code || err.code || '';
+        if (code === 'email_not_confirmed' || msg.toLowerCase().includes('email not confirmed')) {
+          errEl.className = 'p-3 rounded-lg bg-amber-950/60 border border-amber-500/50 text-xs text-amber-200 space-y-1.5';
+          errEl.innerHTML = `
+            <div class="font-bold text-white flex items-center gap-1.5">
+              <span>✉️</span> Email Confirmation Required
+            </div>
+            <p class="leading-relaxed">Supabase requires clicking the confirmation link sent to <strong>${esc(email)}</strong> before signing in.</p>
+            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
+              <span class="text-[#ff9f1c] font-semibold">⚡ Instant Access (No Email Wait):</span> In your Supabase Dashboard, go to <strong>Authentication → Providers → Email</strong> and turn OFF <strong>"Confirm email"</strong>. Then you can log in immediately!
+            </div>
+          `;
+        } else if (code === 'over_email_send_rate_limit' || msg.toLowerCase().includes('rate limit')) {
+          errEl.innerHTML = `
+            <div class="font-bold text-rose-300 flex items-center gap-1.5">
+              <span>⏳</span> Email Rate Limit Reached
+            </div>
+            <p class="leading-relaxed">Supabase free tier limits confirmation emails to 3-4 per hour.</p>
+            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
+              <span class="text-[#ff9f1c] font-semibold">👉 10-Second Fix:</span> In your Supabase Dashboard under <strong>Authentication → Providers → Email</strong>, turn OFF <strong>"Confirm email"</strong>. You will be able to log in instantly without waiting for emails!
+            </div>
+          `;
+        } else if (msg.toLowerCase().includes('invalid login credentials')) {
+          errEl.innerHTML = `⚠️ Invalid email or password. If you haven't created an account yet, click <strong>Create Account</strong>.`;
+        } else {
+          errEl.textContent = msg || 'Failed to sign in. Please verify your credentials.';
+        }
+        errEl.classList.remove('hidden');
+      }
     } finally {
       btn.disabled = false;
       btn.innerHTML = origText;
     }
   } else if (action === 'auth-sign-up') {
-    const email = document.getElementById('authEmailInput')?.value;
-    const pwd   = document.getElementById('authPasswordInput')?.value;
+    const email = document.getElementById('authEmailInput')?.value?.trim();
+    const pwd   = document.getElementById('authPasswordInput')?.value?.trim();
     const errEl = document.getElementById('authErrorMessage');
     if (!email || !pwd) {
-      if (errEl) { errEl.textContent = 'Please enter both email and password.'; errEl.classList.remove('hidden'); }
+      if (errEl) {
+        errEl.className = 'p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300';
+        errEl.innerHTML = '⚠️ Please enter both email and password.';
+        errEl.classList.remove('hidden');
+      }
       return;
     }
     if (pwd.length < 6) {
-      if (errEl) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.classList.remove('hidden'); }
+      if (errEl) {
+        errEl.className = 'p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300';
+        errEl.innerHTML = '⚠️ Password must be at least 6 characters.';
+        errEl.classList.remove('hidden');
+      }
       return;
     }
     btn.disabled = true;
@@ -1615,15 +1662,48 @@ document.addEventListener('click', (e) => {
     btn.textContent = 'Creating...';
     try {
       const data = await CloudSync.signUp(email, pwd);
-      if (data.session) {
+      if (data?.session) {
+        state.user = data.session.user;
+        renderAuthStatus();
         document.getElementById('authModal').classList.add('hidden');
         showToast('Account created & signed in!');
       } else {
-        showToast('Account created! Please check your email to verify if required.');
-        document.getElementById('authModal').classList.add('hidden');
+        // Supabase has "Confirm email" turned ON, so user was created without a live session
+        if (errEl) {
+          errEl.className = 'p-3 rounded-lg bg-amber-950/60 border border-amber-500/50 text-xs text-amber-200 space-y-1.5';
+          errEl.innerHTML = `
+            <div class="font-bold text-white flex items-center gap-1.5">
+              <span>✉️</span> Verification Link Sent!
+            </div>
+            <p>Account created for <strong>${esc(email)}</strong>. Please check your inbox (and spam) to confirm your account.</p>
+            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
+              <span class="text-[#ff9f1c] font-semibold">⚡ Skip Verification:</span> Turn off <strong>"Confirm email"</strong> in your Supabase Dashboard (<strong>Authentication → Providers → Email</strong>) for instant 1-click accounts on all devices.
+            </div>
+          `;
+          errEl.classList.remove('hidden');
+        }
+        showToast('Account created! Please check your email to verify.');
       }
     } catch (err) {
-      if (errEl) { errEl.textContent = err.message || 'Failed to create account'; errEl.classList.remove('hidden'); }
+      if (errEl) {
+        errEl.className = 'p-3 rounded-lg bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300 space-y-1.5';
+        const msg = err.message || '';
+        const code = err.error_code || err.code || '';
+        if (code === 'over_email_send_rate_limit' || msg.toLowerCase().includes('rate limit')) {
+          errEl.innerHTML = `
+            <div class="font-bold text-rose-300 flex items-center gap-1.5">
+              <span>⏳</span> Email Rate Limit Reached
+            </div>
+            <p class="leading-relaxed">Supabase's built-in email service limits verification emails on the free tier.</p>
+            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
+              <span class="text-[#ff9f1c] font-semibold">👉 10-Second Fix:</span> In your Supabase Dashboard under <strong>Authentication → Providers → Email</strong>, turn OFF <strong>"Confirm email"</strong>. Then you can create accounts and sign in instantly without any email limit!
+            </div>
+          `;
+        } else {
+          errEl.textContent = msg || 'Failed to create account';
+        }
+        errEl.classList.remove('hidden');
+      }
     } finally {
       btn.disabled = false;
       btn.innerHTML = origText;
@@ -1636,10 +1716,14 @@ document.addEventListener('click', (e) => {
     if (!state.user) return;
     btn.disabled = true;
     btn.textContent = 'Uploading...';
-    await CloudSync.push(state.items);
+    const res = await CloudSync.push(state.items);
     btn.disabled = false;
     btn.innerHTML = '<span>⬆️</span> Upload Local Entries to Cloud';
-    showToast(`Uploaded ${state.items.length} entries to your cloud account!`);
+    if (res?.error) {
+      showToast(`Upload failed: ${res.error.message || 'Database error'}`);
+    } else {
+      showToast(`Uploaded ${state.items.length} entries to your cloud account!`);
+    }
   } else if (action === 'auth-pull-cloud') {
     if (!state.user) return;
     btn.disabled = true;
@@ -1647,11 +1731,13 @@ document.addEventListener('click', (e) => {
     const remote = await CloudSync.pull();
     btn.disabled = false;
     btn.innerHTML = '<span>⬇️</span> Pull Latest Cloud Library';
-    if (remote) {
+    if (remote && Array.isArray(remote)) {
       state.items = remote;
       saveItems(false);
       renderAll();
       showToast(`Fetched ${remote.length} entries from cloud!`);
+    } else {
+      showToast('No entries found in cloud database');
     }
   } else if (action === 'auth-save-config') {
     const url = document.getElementById('cfgSupabaseUrl')?.value;
@@ -1800,6 +1886,45 @@ if (genreSortSelect) {
     renderGenreView();
   });
 }
+
+// Auth Modal Keyboard and Backdrop Listeners
+const authEmailInp = document.getElementById('authEmailInput');
+if (authEmailInp) {
+  authEmailInp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('authPasswordInput')?.focus();
+    }
+  });
+}
+
+const authPwdInp = document.getElementById('authPasswordInput');
+if (authPwdInp) {
+  authPwdInp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('authSignInBtn')?.click();
+    }
+  });
+}
+
+const authModalBackdrop = document.getElementById('authModal');
+if (authModalBackdrop) {
+  authModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === authModalBackdrop) {
+      authModalBackdrop.classList.add('hidden');
+    }
+  });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const authModal = document.getElementById('authModal');
+    if (authModal && !authModal.classList.contains('hidden')) {
+      authModal.classList.add('hidden');
+    }
+  }
+});
 
 // ---------------------------------------------------------------------------
 // App Bootstrap

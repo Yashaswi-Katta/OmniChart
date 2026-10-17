@@ -472,9 +472,9 @@ const CloudSync = {
 
   /** Push items to user's isolated cloud table (Upsert) */
   async push(items) {
-    if (!state.user || !Array.isArray(items) || items.length === 0) return;
+    if (!state.user || !Array.isArray(items) || items.length === 0) return { ok: true, count: 0 };
     const client = this.getClient();
-    if (!client) return;
+    if (!client) return { error: new Error('Supabase client not initialized') };
 
     try {
       const rows = items.map((item) => ({
@@ -501,9 +501,14 @@ const CloudSync = {
         .from(OMNICHART_CONFIG.supabase.tableName)
         .upsert(rows, { onConflict: 'id,user_id' });
 
-      if (error) console.warn('[CloudSync] Upsert error:', error.message);
+      if (error) {
+        console.warn('[CloudSync] Upsert error:', error.message);
+        return { error };
+      }
+      return { ok: true, count: rows.length };
     } catch (err) {
       console.warn('[CloudSync] Push exception:', err);
+      return { error: err };
     }
   },
 
