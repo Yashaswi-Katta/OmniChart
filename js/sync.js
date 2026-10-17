@@ -704,7 +704,13 @@ const CloudSync = {
     try {
       state.cloudStatus = 'connecting';
       const { data: { session }, error } = await client.auth.getSession();
-      if (!error && session?.user) {
+      const isRecovery = window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery');
+      if (isRecovery) {
+        if (session?.user) state.user = session.user;
+        if (typeof openAuthModal === 'function') {
+          openAuthModal('reset-password');
+        }
+      } else if (!error && session?.user) {
         state.user = session.user;
         state.cloudStatus = 'connected';
         const remoteItems = await this.pull();
@@ -724,8 +730,15 @@ const CloudSync = {
 
     if (typeof renderAuthStatus === 'function') renderAuthStatus();
 
-    // Listen to real-time auth events (Sign In, Sign Out, Token Refresh)
+    // Listen to real-time auth events (Sign In, Sign Out, Token Refresh, Password Recovery)
     client.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        if (session?.user) state.user = session.user;
+        if (typeof openAuthModal === 'function') {
+          openAuthModal('reset-password');
+        }
+        return;
+      }
       if (session?.user) {
         state.user = session.user;
         state.cloudStatus = 'connected';
@@ -780,6 +793,29 @@ const CloudSync = {
     const client = this.getClient();
     if (!client) return;
     await client.auth.signOut();
+  },
+
+  /** Send password recovery email */
+  async resetPasswordForEmail(email) {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase credentials not configured yet. Please configure them in Database Setup.');
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { data, error } = await client.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  /** Update user password (used after password recovery) */
+  async updatePassword(newPassword) {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase credentials not configured yet. Please configure them in Database Setup.');
+    const { data, error } = await client.auth.updateUser({
+      password: newPassword.trim()
+    });
+    if (error) throw error;
+    return data;
   },
 
   /** Push items to user's isolated cloud table (Upsert) */

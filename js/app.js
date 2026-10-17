@@ -516,21 +516,58 @@ function openAuthModal(activeTab = 'account') {
   if (!modal) return;
   modal.classList.remove('hidden');
 
-  const loggedInView  = document.getElementById('authLoggedInView');
-  const loggedOutView = document.getElementById('authLoggedOutView');
-  const errEl         = document.getElementById('authErrorMessage');
+  const loggedInView       = document.getElementById('authLoggedInView');
+  const loggedOutView      = document.getElementById('authLoggedOutView');
+  const forgotPasswordView = document.getElementById('authForgotPasswordView');
+  const resetPasswordView  = document.getElementById('authResetPasswordView');
+  const errEl              = document.getElementById('authErrorMessage');
   if (errEl) errEl.classList.add('hidden');
 
-  if (state.user) {
-    if (loggedInView)  loggedInView.classList.remove('hidden');
-    if (loggedOutView) loggedOutView.classList.add('hidden');
-    const emailEl = document.getElementById('authLoggedInEmail');
-    if (emailEl) emailEl.textContent = state.user.email;
+  const resetSuccess = document.getElementById('authResetSuccessMessage');
+  if (resetSuccess) resetSuccess.classList.add('hidden');
+  const resetErr = document.getElementById('authResetErrorMessage');
+  if (resetErr) resetErr.classList.add('hidden');
+  const newPassErr = document.getElementById('authNewPasswordErrorMessage');
+  if (newPassErr) newPassErr.classList.add('hidden');
+
+  if (activeTab === 'forgot-password') {
+    if (loggedInView)       loggedInView.classList.add('hidden');
+    if (loggedOutView)      loggedOutView.classList.add('hidden');
+    if (resetPasswordView)  resetPasswordView.classList.add('hidden');
+    if (forgotPasswordView) forgotPasswordView.classList.remove('hidden');
+    const mainEmail = document.getElementById('authEmailInput');
+    const resetEmail = document.getElementById('authResetEmailInput');
+    if (resetEmail) {
+      if (mainEmail && mainEmail.value) {
+        resetEmail.value = mainEmail.value.trim();
+      }
+      setTimeout(() => resetEmail.focus(), 60);
+    }
+  } else if (activeTab === 'reset-password') {
+    if (loggedInView)       loggedInView.classList.add('hidden');
+    if (loggedOutView)      loggedOutView.classList.add('hidden');
+    if (forgotPasswordView) forgotPasswordView.classList.add('hidden');
+    if (resetPasswordView)  resetPasswordView.classList.remove('hidden');
+    const newPwd = document.getElementById('authNewPasswordInput');
+    const confPwd = document.getElementById('authConfirmPasswordInput');
+    if (newPwd) newPwd.value = '';
+    if (confPwd) confPwd.value = '';
+    if (newPwd) setTimeout(() => newPwd.focus(), 60);
   } else {
-    if (loggedInView)  loggedInView.classList.add('hidden');
-    if (loggedOutView) loggedOutView.classList.remove('hidden');
-    const pwdInput = document.getElementById('authPasswordInput');
-    if (pwdInput) pwdInput.value = '';
+    // Normal account view
+    if (forgotPasswordView) forgotPasswordView.classList.add('hidden');
+    if (resetPasswordView)  resetPasswordView.classList.add('hidden');
+    if (state.user) {
+      if (loggedInView)  loggedInView.classList.remove('hidden');
+      if (loggedOutView) loggedOutView.classList.add('hidden');
+      const emailEl = document.getElementById('authLoggedInEmail');
+      if (emailEl) emailEl.textContent = state.user.email;
+    } else {
+      if (loggedInView)  loggedInView.classList.add('hidden');
+      if (loggedOutView) loggedOutView.classList.remove('hidden');
+      const pwdInput = document.getElementById('authPasswordInput');
+      if (pwdInput) pwdInput.value = '';
+    }
   }
 }
 window.openAuthModal = openAuthModal;
@@ -2721,6 +2758,107 @@ document.addEventListener('click', async (e) => {
     await CloudSync.signOut();
     document.getElementById('authModal').classList.add('hidden');
     showToast('Signed out. Switched to offline guest mode.');
+  } else if (action === 'show-forgot-password-view') {
+    openAuthModal('forgot-password');
+  } else if (action === 'show-sign-in-view') {
+    openAuthModal('account');
+  } else if (action === 'auth-send-reset-link') {
+    const email = document.getElementById('authResetEmailInput')?.value?.trim();
+    const successEl = document.getElementById('authResetSuccessMessage');
+    const errEl = document.getElementById('authResetErrorMessage');
+    if (successEl) successEl.classList.add('hidden');
+    if (errEl) errEl.classList.add('hidden');
+
+    if (!email || !email.includes('@')) {
+      if (errEl) {
+        errEl.textContent = '⚠️ Please enter a valid email address.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    btn.disabled = true;
+    const origText = btn.innerHTML;
+    btn.textContent = 'Sending...';
+
+    try {
+      await CloudSync.resetPasswordForEmail(email);
+      if (successEl) {
+        successEl.innerHTML = `
+          <div class="font-bold text-white flex items-center gap-1.5 mb-1">
+            <span>✉️</span> Reset Link Sent!
+          </div>
+          <p>We've sent a password reset link to <strong>${esc(email)}</strong>. Please check your inbox (and spam folder) and click the link to set your new password.</p>
+        `;
+        successEl.classList.remove('hidden');
+      }
+      showToast('Password reset email sent! Check your inbox.');
+    } catch (err) {
+      if (errEl) {
+        const msg = err.message || '';
+        if (msg.toLowerCase().includes('rate limit')) {
+          errEl.innerHTML = `⏳ Rate limit reached for reset emails. Please wait a few minutes before trying again.`;
+        } else {
+          errEl.textContent = msg || 'Failed to send password reset email. Please try again.';
+        }
+        errEl.classList.remove('hidden');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  } else if (action === 'auth-update-password') {
+    const newPwd = document.getElementById('authNewPasswordInput')?.value?.trim();
+    const confirmPwd = document.getElementById('authConfirmPasswordInput')?.value?.trim();
+    const errEl = document.getElementById('authNewPasswordErrorMessage');
+    if (errEl) errEl.classList.add('hidden');
+
+    if (!newPwd || !confirmPwd) {
+      if (errEl) {
+        errEl.textContent = '⚠️ Please enter and confirm your new password.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+    if (newPwd.length < 6) {
+      if (errEl) {
+        errEl.textContent = '⚠️ Password must be at least 6 characters.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      if (errEl) {
+        errEl.textContent = '⚠️ Passwords do not match. Please re-enter.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    btn.disabled = true;
+    const origText = btn.innerHTML;
+    btn.textContent = 'Updating...';
+
+    try {
+      const data = await CloudSync.updatePassword(newPwd);
+      if (data?.user) {
+        state.user = data.user;
+        renderAuthStatus();
+      }
+      if (window.location.hash.includes('access_token') || window.location.hash.includes('type=recovery')) {
+        history.replaceState(null, '', window.location.pathname);
+      }
+      document.getElementById('authModal').classList.add('hidden');
+      showToast('🎉 Password updated successfully! You are now signed in.');
+    } catch (err) {
+      if (errEl) {
+        errEl.textContent = err.message || 'Failed to update password. Please try again or request a new reset link.';
+        errEl.classList.remove('hidden');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
   } else if (action === 'auth-upload-local') {
     if (!state.user) return;
     btn.disabled = true;
@@ -3064,6 +3202,36 @@ if (authPwdInp) {
     if (e.key === 'Enter') {
       e.preventDefault();
       document.getElementById('authSignInBtn')?.click();
+    }
+  });
+}
+
+const authResetEmailInp = document.getElementById('authResetEmailInput');
+if (authResetEmailInp) {
+  authResetEmailInp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('authSendResetBtn')?.click();
+    }
+  });
+}
+
+const authNewPwdInp = document.getElementById('authNewPasswordInput');
+if (authNewPwdInp) {
+  authNewPwdInp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('authConfirmPasswordInput')?.focus();
+    }
+  });
+}
+
+const authConfirmPwdInp = document.getElementById('authConfirmPasswordInput');
+if (authConfirmPwdInp) {
+  authConfirmPwdInp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('authUpdatePasswordBtn')?.click();
     }
   });
 }
