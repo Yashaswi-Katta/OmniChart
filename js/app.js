@@ -2374,6 +2374,22 @@ document.addEventListener('click', async (e) => {
   } else if (action === 'export-json') {
     if (moreActions) moreActions.classList.add('hidden');
     exportLibraryJSON();
+  } else if (action === 'restore-seed-library') {
+    if (dropdown) dropdown.classList.add('hidden');
+    if (Array.isArray(window.OMNICHART_SEED_DATA) && window.OMNICHART_SEED_DATA.length > 0) {
+      openConfirmModal({
+        title: 'Restore 397 Master Library?',
+        message: 'This will load the complete, verified 397 anime titles library with full artwork, bilingual titles, genres, and metadata.',
+        onConfirm: () => {
+          state.items = JSON.parse(JSON.stringify(window.OMNICHART_SEED_DATA));
+          saveItems();
+          renderAll();
+          showToast('Loaded 397 perfected anime titles!');
+        }
+      });
+    } else {
+      showToast('Master library seed data not found');
+    }
   } else if (action === 'toggle-bulk-mode') {
     if (moreActions) moreActions.classList.add('hidden');
     if (!OwnerMode.isOwner()) {

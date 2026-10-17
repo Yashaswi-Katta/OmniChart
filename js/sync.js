@@ -491,11 +491,38 @@ function loadItems() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         state.items = parsed;
-        if (sanitizeAndRecoverItems(state.items)) {
-          saveItems();
+
+        // Auto-heal missing metadata on existing items from seed library
+        if (Array.isArray(window.OMNICHART_SEED_DATA) && window.OMNICHART_SEED_DATA.length > 0) {
+          const seedMap = new Map();
+          for (const s of window.OMNICHART_SEED_DATA) {
+            if (s.id) seedMap.set(s.id, s);
+            if (s.title) seedMap.set(s.title.toLowerCase(), s);
+            if (s.titleEnglish) seedMap.set(s.titleEnglish.toLowerCase(), s);
+            if (s.titleRomaji) seedMap.set(s.titleRomaji.toLowerCase(), s);
+          }
+          let healed = false;
+          for (const item of state.items) {
+            const seed = seedMap.get(item.id) || seedMap.get((item.title || '').toLowerCase());
+            if (seed) {
+              if ((!item.titleEnglish || item.titleEnglish === item.title) && seed.titleEnglish) { item.titleEnglish = seed.titleEnglish; healed = true; }
+              if ((!item.titleRomaji || item.titleRomaji === item.title) && seed.titleRomaji) { item.titleRomaji = seed.titleRomaji; healed = true; }
+              if ((!item.studio || item.studio === 'Unknown Studio') && seed.studio) { item.studio = seed.studio; healed = true; }
+              if ((!item.releaseDate || item.releaseDate === 'TBA') && seed.releaseDate) { item.releaseDate = seed.releaseDate; healed = true; }
+              if ((!item.genres || item.genres.length === 0) && seed.genres) { item.genres = [...seed.genres]; healed = true; }
+              if ((!item.synopsis || !item.synopsis.trim()) && seed.synopsis) { item.synopsis = seed.synopsis; healed = true; }
+              if ((!item.image || item.image.includes('u.livechart.me')) && seed.image) { item.image = seed.image; healed = true; }
+            }
+          }
+          if (healed) saveItems(false);
         }
+
+        if (sanitizeAndRecoverItems(state.items)) {
+          saveItems(false);
+        }
+
         // If cloud sync provider is active, pull cloud data and merge
         if (OMNICHART_CONFIG.cloudProvider !== 'localStorage') {
           CloudSync.pull().then((cloudItems) => {
@@ -510,8 +537,16 @@ function loadItems() {
       }
     }
   } catch (e) {}
+
+  // If local storage is empty, initialize with the 397 perfected seed library!
+  if (Array.isArray(window.OMNICHART_SEED_DATA) && window.OMNICHART_SEED_DATA.length > 0) {
+    state.items = JSON.parse(JSON.stringify(window.OMNICHART_SEED_DATA));
+    saveItems(false);
+    return;
+  }
+
   state.items = [];
-  saveItems();
+  saveItems(false);
 }
 
 function saveItems(shouldPushCloud = true) {
