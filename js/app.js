@@ -174,8 +174,12 @@ function getFilteredItems() {
   const filtered = state.items.filter((item) => {
     if (state.category !== 'All' && item.category !== state.category) return false;
     if (state.status !== 'All') {
-      const itemStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
-      if (itemStatus !== state.status) return false;
+      if (state.status === 'Favorites') {
+        if (!item.favorite) return false;
+      } else {
+        const itemStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+        if (itemStatus !== state.status) return false;
+      }
     }
     if (q) {
       let eng = item.titleEnglish || '';
@@ -187,7 +191,7 @@ function getFilteredItems() {
           if (!rom && m.romaji) rom = m.romaji;
         }
       }
-      const hay = `${item.title} ${eng} ${rom} ${item.studio || ''} ${(item.genres || []).join(' ')} ${item.consumedDate || ''}`.toLowerCase();
+      const hay = `${item.title} ${eng} ${rom} ${item.studio || ''} ${(item.genres || []).join(' ')} ${(item.tags || []).join(' ')} ${item.consumedDate || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -349,7 +353,7 @@ function renderNavigation() {
 
   const statusTabs = document.getElementById('statusTabs');
   if (statusTabs) {
-    statusTabs.innerHTML = STATUSES.map((st) => {
+    const tabsHtml = STATUSES.map((st) => {
       const count = state.items.filter((i) => {
         if (state.category !== 'All' && i.category !== state.category) return false;
         const itemStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(i.status) : i.status;
@@ -372,6 +376,34 @@ function renderNavigation() {
         <span class="text-[10px] px-1.5 py-0.2 rounded ${active ? 'bg-[#0d0e11]/20 text-[#0d0e11]' : isZero ? 'bg-[#0d0e11] text-slate-600' : 'bg-[#2c3539] text-slate-400'}">${count}</span>
       </button>`;
     }).join('');
+
+    const favCount = state.items.filter((i) => {
+      if (state.category !== 'All' && i.category !== state.category) return false;
+      return Boolean(i.favorite);
+    }).length;
+    const isFavActive = state.status === 'Favorites';
+    const favZero = favCount === 0 && !isFavActive;
+
+    const favTabHtml = `
+      <button
+        data-action="set-status"
+        data-status="Favorites"
+        class="px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition ${
+          isFavActive
+            ? 'bg-amber-400 text-[#0d0e11] font-bold shadow-sm'
+            : favZero
+              ? 'bg-[#0d0e11]/50 text-amber-500/50 border border-amber-500/20 opacity-40 hover:opacity-80'
+              : 'bg-[#0d0e11] text-amber-300 hover:text-amber-200 border border-amber-500/30'
+        }"
+      >
+        <span>★ Favorites</span>
+        <span class="text-[10px] px-1.5 py-0.2 rounded ${
+          isFavActive ? 'bg-[#0d0e11]/20 text-[#0d0e11]' : favZero ? 'bg-[#0d0e11] text-slate-600' : 'bg-[#2c3539] text-amber-300'
+        }">${favCount}</span>
+      </button>
+    `;
+
+    statusTabs.innerHTML = tabsHtml + favTabHtml;
   }
 
   // Update Toolbar Toggles (L7, L9, L10)
@@ -683,6 +715,15 @@ function renderLibrary() {
             />
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-action="toggle-favorite"
+                  data-id="${esc(item.id)}"
+                  title="${item.favorite ? 'Remove from favorites' : 'Mark as favorite'}"
+                  class="text-sm transition hover:scale-110 shrink-0 ${item.favorite ? 'text-amber-400' : 'text-slate-500 hover:text-amber-400'}"
+                >
+                  ${item.favorite ? '★' : '☆'}
+                </button>
                 <h4
                   class="font-bold text-sm text-white truncate cursor-pointer hover:text-[#ff9f1c] transition"
                   data-action="${isOwner ? 'edit-item' : 'view-item'}"
@@ -699,6 +740,10 @@ function renderLibrary() {
                 <span class="truncate">${esc(cleanStudio)}</span>
                 ${item.releaseDate && item.releaseDate !== 'TBA' ? `<span>•</span><span>${esc(item.releaseDate)}</span>` : ''}
                 ${item.consumedDate ? `<span>•</span><span class="text-[#ff9f1c]">📅 ${esc(item.consumedDate)}</span>` : ''}
+                ${(Array.isArray(item.tags) && item.tags.length > 0) ? `
+                  <span>•</span>
+                  ${item.tags.map(t => `<button type="button" data-action="filter-by-tag" data-tag="${esc(t)}" class="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/25 transition">#${esc(t)}</button>`).join(' ')}
+                ` : ''}
               </div>
             </div>
           </div>
@@ -815,6 +860,11 @@ function renderLibrary() {
                     >\uD83D\uDCC5 ${esc(item.consumedDate)}</button>
                   ` : ''}
                 </div>
+                ${(Array.isArray(item.tags) && item.tags.length > 0) ? `
+                  <div class="flex items-center gap-1 mt-1 flex-wrap">
+                    ${item.tags.map(t => `<button type="button" data-action="filter-by-tag" data-tag="${esc(t)}" class="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/25 transition">#${esc(t)}</button>`).join('')}
+                  </div>
+                ` : ''}
               </div>
             </div>
 
@@ -883,6 +933,19 @@ function renderLibrary() {
               >
                 <span>\u2605</span>
                 <span>${rating > 0 ? rating.toFixed(1).replace(/\.0$/, '') : '\u2013'}</span>
+              </button>
+              <button
+                type="button"
+                data-action="toggle-favorite"
+                data-id="${esc(item.id)}"
+                title="${item.favorite ? 'Remove from favorites' : 'Mark as favorite'}"
+                class="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shadow-md transition ${
+                  item.favorite
+                    ? 'bg-amber-400 text-[#0d0e11]'
+                    : 'bg-[#0d0e11]/80 text-slate-400 hover:text-amber-300 hover:bg-[#0d0e11]'
+                }"
+              >
+                <span>${item.favorite ? '★' : '☆'}</span>
               </button>
             </div>
 
@@ -1877,6 +1940,10 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('fieldImage').value            = item.image || '';
     document.getElementById('fieldNotes').value            = item.notes || '';
     document.getElementById('fieldSynopsis').value         = item.synopsis || '';
+    const fieldFav = document.getElementById('fieldFavorite');
+    const fieldTags = document.getElementById('fieldTags');
+    if (fieldFav) fieldFav.checked = !!item.favorite;
+    if (fieldTags) fieldTags.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
     updateModalPosterPreview(item.image || '');
 
     currentModalGenres = Array.isArray(item.genres)
@@ -1905,6 +1972,10 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('fieldImage').value            = '';
     document.getElementById('fieldNotes').value            = '';
     document.getElementById('fieldSynopsis').value         = '';
+    const fieldFav = document.getElementById('fieldFavorite');
+    const fieldTags = document.getElementById('fieldTags');
+    if (fieldFav) fieldFav.checked = false;
+    if (fieldTags) fieldTags.value = '';
     updateModalPosterPreview('');
 
     currentModalGenres = [];
@@ -1917,7 +1988,7 @@ function openMediaModal(item = null, presetDate = '') {
   // Progressive disclosure accordion (F1): open if item has details filled in, else closed
   const acc = document.getElementById('modalMoreDetailsAccordion');
   if (acc) {
-    acc.open = !!(item && (item.notes || item.consumedDate || item.synopsis || (item.genres && item.genres.length > 0) || item.studio || item.releaseDate));
+    acc.open = !!(item && (item.notes || item.consumedDate || item.synopsis || (item.genres && item.genres.length > 0) || item.studio || item.releaseDate || item.favorite || (item.tags && item.tags.length > 0)));
   }
 
   // Set active genre category pill
@@ -2022,6 +2093,13 @@ function saveMediaFromModal() {
     }
   }
 
+  const fieldFav = document.getElementById('fieldFavorite');
+  const fieldTags = document.getElementById('fieldTags');
+  const favorite = fieldFav ? fieldFav.checked : false;
+  const tags = fieldTags
+    ? fieldTags.value.split(',').map((t) => t.trim().replace(/^#/, '')).filter(Boolean)
+    : [];
+
   const entry = {
     id,
     title,
@@ -2029,6 +2107,8 @@ function saveMediaFromModal() {
     titleRomaji,
     category,
     status,
+    favorite,
+    tags,
     rating,
     progress,
     totalUnits,
@@ -2246,6 +2326,25 @@ document.addEventListener('click', async (e) => {
     renderCalendar();
   } else if (action === 'save-media') {
     saveMediaFromModal();
+  } else if (action === 'toggle-favorite') {
+    e.stopPropagation();
+    const id = btn.dataset.id;
+    const item = state.items.find((i) => i.id === id);
+    if (item) {
+      item.favorite = !item.favorite;
+      item.updatedAt = Date.now();
+      saveItems();
+      renderNavigation();
+      renderLibrary();
+      showToast(item.favorite ? `Marked "${item.title}" as Favorite ★` : `Removed "${item.title}" from Favorites`);
+    }
+  } else if (action === 'filter-by-tag') {
+    e.stopPropagation();
+    const tag = btn.dataset.tag;
+    state.search = tag;
+    const searchInput = document.getElementById('librarySearchInput');
+    if (searchInput) searchInput.value = tag;
+    renderLibrary();
   } else if (action === 'edit-item') {
     e.stopPropagation();
     const item = state.items.find((i) => i.id === btn.dataset.id);

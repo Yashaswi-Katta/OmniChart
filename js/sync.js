@@ -579,6 +579,8 @@ function importLibraryJSON(file) {
           releaseDate:  raw.releaseDate || 'TBA',
           consumedDate: raw.consumedDate || '',
           genres:       Array.isArray(raw.genres) ? raw.genres : [],
+          favorite:     Boolean(raw.favorite),
+          tags:         Array.isArray(raw.tags) ? raw.tags : [],
           image:        raw.image || '',
           synopsis:     raw.synopsis || '',
           notes:        raw.notes || '',
@@ -832,12 +834,14 @@ const CloudSync = {
       state.cloudStatus = 'syncing';
       if (typeof renderAuthStatus === 'function') renderAuthStatus();
 
-      const rows = items.map((item) => ({
+      let rows = items.map((item) => ({
         id: item.id,
         user_id: state.user.id,
         title: item.title,
         category: item.category || 'Series & Anime',
         status: (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status,
+        favorite: Boolean(item.favorite),
+        tags: Array.isArray(item.tags) ? item.tags : [],
         rating: Number(item.rating || 0),
         progress: Number(item.progress || 0),
         total_units: Number(item.totalUnits || 12),
@@ -852,9 +856,18 @@ const CloudSync = {
         updated_at: Number(item.updatedAt || Date.now())
       }));
 
-      const { error } = await client
+      let { error } = await client
         .from(OMNICHART_CONFIG.supabase.tableName)
         .upsert(rows, { onConflict: 'id,user_id' });
+
+      // Graceful fallback if remote Supabase schema has not added favorite/tags columns yet
+      if (error && (error.message?.includes('favorite') || error.message?.includes('tags'))) {
+        const fallbackRows = rows.map(({ favorite, tags, ...rest }) => rest);
+        const retry = await client
+          .from(OMNICHART_CONFIG.supabase.tableName)
+          .upsert(fallbackRows, { onConflict: 'id,user_id' });
+        error = retry.error;
+      }
 
       if (error) {
         console.warn('[CloudSync] Upsert error:', error.message);
@@ -980,6 +993,8 @@ const CloudSync = {
           releaseDate: row.release_date || 'TBA',
           consumedDate: row.consumed_date || '',
           genres: Array.isArray(row.genres) ? row.genres : [],
+          favorite: Boolean(row.favorite),
+          tags: Array.isArray(row.tags) ? row.tags : [],
           image: row.image || '',
           synopsis: row.synopsis || '',
           notes: row.notes || '',
@@ -1059,6 +1074,8 @@ CREATE TABLE IF NOT EXISTS public.omnichart_items (
     release_date TEXT DEFAULT 'TBA',
     consumed_date TEXT DEFAULT '',
     genres TEXT[] DEFAULT '{}',
+    favorite BOOLEAN DEFAULT false,
+    tags TEXT[] DEFAULT '{}',
     image TEXT DEFAULT '',
     synopsis TEXT DEFAULT '',
     notes TEXT DEFAULT '',
