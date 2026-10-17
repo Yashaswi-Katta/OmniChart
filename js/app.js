@@ -2689,16 +2689,93 @@ function updateShareModalModeButtons() {
   }
 }
 
-function loadImageSafe(url) {
-  return new Promise((resolve) => {
-    if (!url) return resolve(null);
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    setTimeout(() => resolve(null), 2500);
-    img.src = url;
-  });
+function drawImageCover(ctx, img, x, y, w, h) {
+  if (!img) return;
+  const imgW = img.naturalWidth || img.width || w;
+  const imgH = img.naturalHeight || img.height || h;
+  const targetRatio = w / h;
+  const imgRatio = imgW / imgH;
+  let sX = 0, sY = 0, sW = imgW, sH = imgH;
+  if (imgRatio > targetRatio) {
+    sW = imgH * targetRatio;
+    sX = (imgW - sW) / 2;
+  } else {
+    sH = imgW / targetRatio;
+    sY = (imgH - sH) / 2;
+  }
+  ctx.drawImage(img, sX, sY, sW, sH, x, y, w, h);
+}
+
+async function loadImageSafe(rawUrl) {
+  if (!rawUrl) return null;
+  const url = String(rawUrl).trim();
+  if (!url) return null;
+
+  // 1. Data URLs or Blob URLs — local, no CORS required
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+
+  // 2. Determine best CORS-friendly URL
+  let primaryUrl = url;
+  if (url.includes('livechart.me')) {
+    // Livechart blocks direct CORS with Cloudflare 403 challenge.
+    // wsrv.nl proxies LiveChart images with Access-Control-Allow-Origin: *
+    const stripped = url.replace(/^https?:\/\//, '');
+    primaryUrl = `https://wsrv.nl/?url=${encodeURIComponent(stripped)}`;
+  } else {
+    // For AniList, MAL, etc., bust the non-CORS browser cache created by the <img> tags
+    primaryUrl = url + (url.includes('?') ? '&cors=1' : '?cors=1');
+  }
+
+  // Helper to load standard Image element
+  const loadImgEl = (src, withCors = true, timeout = 3500) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      if (withCors) img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      setTimeout(() => resolve(null), timeout);
+      img.src = src;
+    });
+  };
+
+  // Attempt A: Fetch as Blob -> ObjectURL (bypasses CORS cache poison & guarantees non-tainted canvas)
+  try {
+    const res = await fetch(primaryUrl, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const img = await loadImgEl(objUrl, false, 3000);
+      if (img) return img;
+    }
+  } catch (err) {
+    // Fetch failed (network or strict CSP)
+  }
+
+  // Attempt B: Load HTML Image with crossOrigin on primaryUrl
+  let img = await loadImgEl(primaryUrl, true, 3500);
+  if (img) return img;
+
+  // Attempt C: Proxy fallback via wsrv.nl if not tried yet and not anilist/mal
+  if (!primaryUrl.includes('wsrv.nl') && !url.includes('anilist.co') && !url.includes('myanimelist.net')) {
+    const stripped = url.replace(/^https?:\/\//, '');
+    const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(stripped)}`;
+    img = await loadImgEl(proxyUrl, true, 3000);
+    if (img) return img;
+  }
+
+  // Attempt D: Fallback to direct load WITHOUT CORS
+  // Ensures poster ALWAYS renders visually on the canvas even if host blocks CORS
+  img = await loadImgEl(url, false, 3000);
+  if (img) return img;
+
+  return null;
 }
 
 async function renderShareCard() {
@@ -2748,9 +2825,10 @@ async function renderShareCard() {
     ctx.fillStyle = '#0d0e11';
     ctx.fillRect(posterX, posterY, posterW, posterH);
 
-    const posterImg = await loadImageSafe(curItem.image);
+    const posterUrl = curItem.image || makeFallbackPoster(curItem.title);
+    const posterImg = await loadImageSafe(posterUrl);
     if (posterImg) {
-      ctx.drawImage(posterImg, posterX, posterY, posterW, posterH);
+      drawImageCover(ctx, posterImg, posterX, posterY, posterW, posterH);
     } else {
       ctx.fillStyle = '#1e2428';
       ctx.fillRect(posterX, posterY, posterW, posterH);
@@ -2869,7 +2947,7 @@ async function renderShareCard() {
     const cellH = 290;
     const gap = 20;
 
-    const loadedImages = await Promise.all(candidates.map(item => loadImageSafe(item.image)));
+    const loadedImages = await Promise.all(candidates.map(item => loadImageSafe(item.image || makeFallbackPoster(item.title))));
 
     for (let i = 0; i < 9; i++) {
       const col = i % 3;
@@ -2885,7 +2963,7 @@ async function renderShareCard() {
 
       if (item) {
         if (img) {
-          ctx.drawImage(img, x, y, cellW, cellH);
+          drawImageCover(ctx, img, x, y, cellW, cellH);
         } else {
           ctx.fillStyle = '#2c3539';
           ctx.fillRect(x, y, cellW, cellH);
@@ -2950,8 +3028,12 @@ async function renderShareCard() {
   // Update preview image
   try {
     preview.src = canvas.toDataURL('image/png');
+    preview.classList.remove('hidden');
+    canvas.classList.add('hidden');
   } catch (err) {
-    console.warn('[Canvas Export CORS Fallback]', err);
+    console.warn('[Canvas Export CORS Fallback - displaying canvas directly]', err);
+    preview.classList.add('hidden');
+    canvas.classList.remove('hidden');
   }
 
   if (spinner) spinner.classList.add('hidden');
@@ -3015,7 +3097,7 @@ function downloadShareCard() {
     a.click();
     showToast('Downloaded shareable card! 📸');
   } catch (e) {
-    showToast('Failed to export image due to browser canvas restrictions.');
+    showToast('Contains cross-origin images: Right-click card preview and choose "Save image as"');
   }
 }
 
