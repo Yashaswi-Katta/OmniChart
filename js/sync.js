@@ -5,7 +5,7 @@
    for instant Supabase or Firebase cross-device synchronization.
    ========================================================================== */
 
-const STORAGE_KEY = 'omnichart_v4_items';
+const STORAGE_KEY = 'omnichart_v5_items';
 
 // ---------------------------------------------------------------------------
 // HTML Escaping Utility for XSS Prevention
@@ -488,6 +488,14 @@ window.addEventListener('offline', () => {
 
 function loadItems() {
   try {
+    // One-time purge of legacy auto-seeded library from pre-v5 versions
+    if (!localStorage.getItem('omnichart_seed_purged_v5')) {
+      localStorage.removeItem('omnichart_v4_items');
+      localStorage.removeItem('omnichart_v3_items');
+      localStorage.removeItem('omnichart_items');
+      localStorage.setItem('omnichart_seed_purged_v5', 'true');
+    }
+
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
