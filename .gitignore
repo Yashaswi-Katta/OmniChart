@@ -12,3 +12,6 @@ desktop.ini
 # Log files & scratch
 *.log
 scratch/
+
+# User data & personal library exports
+data/
