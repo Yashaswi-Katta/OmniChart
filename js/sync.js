@@ -682,7 +682,9 @@ const CloudSync = {
         this._client = window.supabase.createClient(url, key, {
           auth: {
             persistSession: true,
-            autoRefreshToken: true
+            autoRefreshToken: true,
+            flowType: 'implicit',
+            detectSessionInUrl: true
           }
         });
       } catch (err) {
@@ -876,56 +878,96 @@ const CloudSync = {
     const client = this.getClient();
     if (!client) throw new Error('Supabase client not initialized');
 
-    const parsed = this.parseRecoveryInput(input);
+    if (!input || typeof input !== 'string') {
+      throw new Error('Please paste a link, URL, or token.');
+    }
+
+    const str = input.trim();
+
+    // Check if the user pasted an expired/consumed error URL from Supabase
+    if (str.includes('error_description=') || str.includes('error=')) {
+      const match = str.match(/error_description=([^&]+)/);
+      const desc = match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : 'Email link is invalid or has expired';
+      throw new Error(`⚠️ ${desc}. Supabase reset links can only be used once. Please click "Send Reset Link" above to request a fresh email.`);
+    }
+
+    // Check if user pasted bare localhost URL without any token/hash
+    if (/^https?:\/\/localhost(?::\d+)?\/?$/i.test(str)) {
+      throw new Error("⚠️ Only the address 'localhost:3000' was pasted, missing the security token. In that tab's address bar, press Ctrl+A to copy the whole address including '#access_token=...', or copy the link directly from your email.");
+    }
+
+    const parsed = this.parseRecoveryInput(str);
     if (!parsed) throw new Error('Please enter a valid reset link, token, or URL.');
 
-    // 1. Direct access_token + refresh_token from localhost address bar
-    if (parsed.accessToken && parsed.refreshToken) {
+    // 1. Direct access_token (+ refresh_token) from localhost address bar
+    if (parsed.accessToken) {
       const { data, error } = await client.auth.setSession({
         access_token: parsed.accessToken,
-        refresh_token: parsed.refreshToken
+        refresh_token: parsed.refreshToken || parsed.accessToken
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message && (error.message.includes('expired') || error.message.includes('invalid'))) {
+          throw new Error('⚠️ This reset token has expired or was already used. Please click "Send Reset Link" above to request a fresh email.');
+        }
+        throw error;
+      }
       if (data?.user) state.user = data.user;
       return data;
     }
 
-    // 2. PKCE code exchange (?code=...)
-    if (parsed.code) {
-      const { data, error } = await client.auth.exchangeCodeForSession(parsed.code);
-      if (error) throw error;
-      if (data?.user) state.user = data.user;
-      return data;
-    }
-
-    // 3. token_hash verification from email link
-    if (parsed.tokenHash) {
+    // 2. Token from verify URL (e.g. pkce_... or hex hash from email link)
+    const tokenHash = parsed.tokenHash || (parsed.token && (parsed.token.startsWith('pkce_') || parsed.token.length > 20) ? parsed.token : null);
+    if (tokenHash) {
       const { data, error } = await client.auth.verifyOtp({
-        token_hash: parsed.tokenHash,
+        token_hash: tokenHash,
         type: 'recovery'
       });
-      if (error) throw error;
-      if (data?.user) state.user = data.user;
-      return data;
+      if (!error && data?.user) {
+        state.user = data.user;
+        return data;
+      }
+      if (error) {
+        const msg = error.message || '';
+        if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid')) {
+          throw new Error('⚠️ This recovery link has expired or was already used. Please click "Send Reset Link" above to request a fresh email.');
+        }
+        throw error;
+      }
     }
 
-    // 4. Token verification with email
+    // 3. Raw 6-digit OTP code or short token
     if (parsed.token) {
-      const targetEmail = (email || '').trim();
+      const targetEmail = (email || document.getElementById('authResetEmailInput')?.value || '').trim();
       if (!targetEmail) {
-        throw new Error('Please enter your account email in the box above to verify this token.');
+        throw new Error('Please enter your account email in the box above so we can verify this code.');
       }
       const { data, error } = await client.auth.verifyOtp({
         email: targetEmail,
         token: parsed.token,
         type: 'recovery'
       });
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || '';
+        if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid')) {
+          throw new Error('⚠️ Invalid or expired code. Please click "Send Reset Link" above to request a new email.');
+        }
+        throw error;
+      }
       if (data?.user) state.user = data.user;
       return data;
     }
 
-    throw new Error('Could not find recovery credentials in the provided text. Please paste the full URL or token.');
+    // 4. PKCE code exchange (?code=...)
+    if (parsed.code) {
+      const { data, error } = await client.auth.exchangeCodeForSession(parsed.code);
+      if (error) {
+        throw new Error('⚠️ Could not exchange auth code. Please request a new reset link using "Send Reset Link" above.');
+      }
+      if (data?.user) state.user = data.user;
+      return data;
+    }
+
+    throw new Error('Could not find recovery credentials in the provided text. Please copy the full URL from your address bar or email.');
   },
 
   /** Update user password (used after password recovery) */
