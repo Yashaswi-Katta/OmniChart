@@ -192,12 +192,202 @@ async function runAutoSearch(query) {
 }
 
 // ---------------------------------------------------------------------------
-// Batch Metadata Enricher (AniList GraphQL)
+// Smart Title Cleaning & Candidate Matching Helper
+// ---------------------------------------------------------------------------
+
+/** Clean anime title for accurate AniList & Wikipedia queries */
+function getCleanSearchTitle(rawTitle) {
+  if (!rawTitle) return '';
+  let t = String(rawTitle).trim();
+  // 1. Strip bracketed noise e.g. [Dub], [Sub], [1080p]
+  t = t.replace(/\s*\[[^\]]+\]/gi, '');
+  // 2. Strip broadcast tags e.g. (TV), (Movie), (ONA)
+  t = t.replace(/\s*\(?(?:TV|Movie|ONA|OVA|Special|Dub|Sub|Subbed|Dubbed)\)?/gi, '');
+  // 3. Strip seasons, parts, cours with optional hyphen or colon
+  t = t.replace(/\s*[-:]?\s*\(?(?:Season\s*\d+|2nd\s*Season|3rd\s*Season|4th\s*Season|Final\s*Season|Part\s*\d+|Cour\s*\d+)\)?/gi, '');
+  // 4. Strip dangling punctuation at the end
+  t = t.replace(/[\s\-:]+$/g, '');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t || rawTitle.trim();
+}
+
+/** Pick best AniList match among candidates based on format and title */
+function pickBestAniListMedia(candidates, item) {
+  if (!candidates || candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  const clean = getCleanSearchTitle(item.title).toLowerCase();
+
+  // 1. Try exact match on English or Romaji title
+  const exact = candidates.find((c) => {
+    const eng = (c.title?.english || '').toLowerCase();
+    const rom = (c.title?.romaji || '').toLowerCase();
+    return eng === clean || rom === clean;
+  });
+  if (exact) return exact;
+
+  // 2. Format matching (prefer TV for series, MOVIE for movie)
+  if (item.category === 'Movies') {
+    const movie = candidates.find((c) => c.format === 'MOVIE');
+    if (movie) return movie;
+  } else {
+    const tv = candidates.find((c) => c.format === 'TV' || c.format === 'TV_SHORT' || c.format === 'ONA');
+    if (tv) return tv;
+  }
+
+  return candidates[0];
+}
+
+/** Apply enriched media metadata cleanly to an item without clobbering manual edits */
+function applyAniListMedia(item, media, forceAll = false) {
+  if (!item || !media) return false;
+  let changed = false;
+  const edited = item._manualFields || [];
+
+  // English & Romaji titles (L7)
+  if (media.title?.english && (!item.titleEnglish || forceAll)) {
+    item.titleEnglish = media.title.english;
+    changed = true;
+  }
+  if (media.title?.romaji && (!item.titleRomaji || forceAll)) {
+    item.titleRomaji = media.title.romaji;
+    changed = true;
+  }
+
+  // Deduplicated Studios (L3)
+  const studioNodes   = media.studios?.nodes || [];
+  const animStudios   = Array.from(new Set(studioNodes.filter((n) => n.isAnimationStudio).map((n) => n.name).filter(Boolean)));
+  const allStudios    = Array.from(new Set(studioNodes.map((n) => n.name).filter(Boolean)));
+  const chosenStudios = (animStudios.length > 0 ? animStudios : allStudios).slice(0, 2).join(', ');
+
+  if (chosenStudios && !edited.includes('studio') && (!item.studio || item.studio === 'Unknown Studio' || forceAll)) {
+    item.studio = chosenStudios;
+    changed = true;
+  }
+
+  // Release Date
+  const rel = formatSeasonYear(media.season, media.seasonYear, media.startDate?.year);
+  if (rel !== 'TBA' && !edited.includes('releaseDate') && (!item.releaseDate || item.releaseDate === 'TBA' || forceAll)) {
+    item.releaseDate = rel;
+    changed = true;
+  }
+
+  // Genres
+  if (Array.isArray(media.genres) && media.genres.length > 0 && !edited.includes('genres') && (!item.genres || item.genres.length === 0 || forceAll)) {
+    item.genres = media.genres.slice(0, 4);
+    changed = true;
+  }
+
+  // Synopsis
+  const cleanDesc = cleanHtmlSynopsis(media.description);
+  if (cleanDesc && !edited.includes('synopsis') && (!item.synopsis || item.synopsis.trim() === '' || forceAll)) {
+    item.synopsis = cleanDesc;
+    changed = true;
+  }
+
+  // Poster fallback
+  if (!item.image && (media.coverImage?.extraLarge || media.coverImage?.large)) {
+    item.image = media.coverImage.extraLarge || media.coverImage.large;
+    changed = true;
+  }
+
+  // Total episodes
+  if (media.episodes && (!item.totalUnits || item.totalUnits === 12)) {
+    item.totalUnits = media.episodes;
+    if (item.status === 'Completed') item.progress = media.episodes;
+    changed = true;
+  }
+
+  if (media.format === 'MOVIE') {
+    item.category   = 'Movies';
+    item.unitName   = 'movie';
+    item.totalUnits = 1;
+    if (item.status === 'Completed') item.progress = 1;
+    changed = true;
+  }
+
+  if (changed) {
+    item.updatedAt = Date.now();
+  }
+  return changed;
+}
+
+/** Wikipedia API fallback for titles missed or unindexed by AniList */
+async function fetchWikiFallback(item) {
+  try {
+    const cleanTitle = getCleanSearchTitle(item.title);
+    const url = `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(cleanTitle)}&gsrlimit=1&prop=pageimages|extracts&exintro=1&explaintext=1&exchars=350&piprop=thumbnail&pithumbsize=500`;
+    const res = await fetch(url);
+    if (!res.ok) return false;
+    const data = await res.json();
+    const page = Object.values(data?.query?.pages || {})[0];
+    if (!page) return false;
+    let changed = false;
+    const edited = item._manualFields || [];
+
+    if (page.extract && !edited.includes('synopsis') && (!item.synopsis || item.synopsis.trim() === '')) {
+      item.synopsis = page.extract.trim();
+      changed = true;
+    }
+    if (page.thumbnail?.source && !item.image) {
+      item.image = page.thumbnail.source;
+      changed = true;
+    }
+    const ym = page.extract?.match(/\b(19\d{2}|20\d{2})\b/);
+    if (ym && !edited.includes('releaseDate') && (!item.releaseDate || item.releaseDate === 'TBA')) {
+      item.releaseDate = ym[1];
+      changed = true;
+    }
+    if (changed) {
+      item.updatedAt = Date.now();
+    }
+    return changed;
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Individual single query fallback if a batch query fails */
+async function fetchSingleAniList(item) {
+  const cleanTitle = getCleanSearchTitle(item.title);
+  const safeSearch = cleanTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const q = `query {
+    Page(perPage: 3) {
+      media(search: "${safeSearch}", type: ANIME) {
+        title { english romaji native }
+        season
+        seasonYear
+        startDate { year }
+        episodes
+        format
+        genres
+        description(asHtml: false)
+        studios { nodes { name isAnimationStudio } }
+        coverImage { extraLarge large }
+      }
+    }
+  }`;
+  try {
+    const res = await fetch('https://graphql.anilist.co', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ query: q })
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json?.data?.Page?.media || [];
+    }
+  } catch (e) {}
+  return [];
+}
+
+// ---------------------------------------------------------------------------
+// Batch Metadata Enricher (AniList GraphQL + Wikipedia Fallback)
 // ---------------------------------------------------------------------------
 
 /**
  * Walk through every library item that is missing Studio, Release Date,
- * Genres, or Synopsis and batch-query AniList to auto-fill them.
+ * Genres, Synopsis, English title, or Romaji title and enrich them.
  */
 async function enrichMissingMetadata(forceAll = false, customTargets = null) {
   if (state.enrichRunning) return;
@@ -214,7 +404,8 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
     const missingDate    = !item.releaseDate || item.releaseDate === 'TBA';
     const missingSyn     = !item.synopsis || item.synopsis.trim() === '';
     const missingGenres  = !Array.isArray(item.genres) || item.genres.length === 0;
-    return missingStudio || missingDate || missingSyn || missingGenres;
+    const missingLang    = !item.titleEnglish || !item.titleRomaji;
+    return missingStudio || missingDate || missingSyn || missingGenres || missingLang;
   });
 
   if (targets.length === 0) {
@@ -233,7 +424,7 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
   const progressBar = document.getElementById('enrichProgressBar');
   if (banner) banner.classList.remove('hidden');
 
-  const BATCH_SIZE   = 12;
+  const BATCH_SIZE   = 8;
   let   processed    = 0;
   let   updatedCount = 0;
 
@@ -244,18 +435,19 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
     const pct   = Math.round((processed / targets.length) * 100);
     if (progressBar) progressBar.style.width = `${pct}%`;
     if (statusText) {
-      statusText.textContent = `⚡ [AniList] Auto-filling Studio, Release Date, Genres & Synopsis (${processed} / ${targets.length})...`;
+      statusText.textContent = `⚡ [AniList] Auto-filling Studio, Release Date, Genres & Titles (${processed} / ${targets.length})...`;
     }
 
     const queryFields = batch.map((item, idx) => {
-      const safeSearch = item.title
+      const cleanTitle = getCleanSearchTitle(item.title);
+      const safeSearch = cleanTitle
         .replace(/\\/g, '\\\\')
         .replace(/"/g, '\\"')
         .replace(/\s+/g, ' ')
         .trim();
-      return `q${idx}: Page(perPage: 1) {
+      return `q${idx}: Page(perPage: 3) {
         media(search: "${safeSearch}", type: ANIME) {
-          title { english romaji }
+          title { english romaji native }
           season
           seasonYear
           startDate { year }
@@ -270,9 +462,10 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
     });
 
     const fullQuery = `query {\n${queryFields.join('\n')}\n}`;
+    let batchSuccess = false;
 
     try {
-      const res = await fetch('https://graphql.anilist.co', {
+      let res = await fetch('https://graphql.anilist.co', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -281,79 +474,62 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
         body: JSON.stringify({ query: fullQuery })
       });
 
+      // Handle AniList rate limit gracefully
+      if (res.status === 429) {
+        await new Promise((r) => setTimeout(r, 2000));
+        res = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ query: fullQuery })
+        });
+      }
+
       if (res.ok) {
         const json = await res.json();
         const data = json?.data || {};
 
-        batch.forEach((item, idx) => {
-          const media = data[`q${idx}`]?.media?.[0];
-          if (!media) return;
+        for (let idx = 0; idx < batch.length; idx++) {
+          const item = batch[idx];
+          const candidates = data[`q${idx}`]?.media || [];
+          const media = pickBestAniListMedia(candidates, item);
 
-          // English & Romaji titles (L7)
-          if (media.title?.english && !item.titleEnglish) item.titleEnglish = media.title.english;
-          if (media.title?.romaji && !item.titleRomaji)   item.titleRomaji  = media.title.romaji;
-
-          // Studio / Creator - Deduplicated (L3)
-          const studioNodes   = media.studios?.nodes || [];
-          const animStudios   = Array.from(new Set(studioNodes.filter((n) => n.isAnimationStudio).map((n) => n.name).filter(Boolean)));
-          const allStudios    = Array.from(new Set(studioNodes.map((n) => n.name).filter(Boolean)));
-          const chosenStudios = (animStudios.length > 0 ? animStudios : allStudios).slice(0, 2).join(', ');
-          
-          // Never overwrite manually edited fields (B3)
-          const edited = item._manualFields || [];
-
-          if (chosenStudios && !edited.includes('studio') && (!item.studio || item.studio === 'Unknown Studio' || forceAll)) {
-            item.studio = chosenStudios;
+          if (media) {
+            if (applyAniListMedia(item, media, forceAll)) {
+              updatedCount++;
+            }
+          } else {
+            // Fallback to Wikipedia if AniList returned empty
+            const wikiUpdated = await fetchWikiFallback(item);
+            if (wikiUpdated) updatedCount++;
           }
-
-          // Release Date
-          const rel = formatSeasonYear(media.season, media.seasonYear, media.startDate?.year);
-          if (rel !== 'TBA' && !edited.includes('releaseDate') && (!item.releaseDate || item.releaseDate === 'TBA' || forceAll)) {
-            item.releaseDate = rel;
-          }
-
-          // Genres
-          if (Array.isArray(media.genres) && media.genres.length > 0 && !edited.includes('genres') && (!item.genres || item.genres.length === 0 || forceAll)) {
-            item.genres = media.genres.slice(0, 4);
-          }
-
-          // Synopsis
-          const cleanDesc = cleanHtmlSynopsis(media.description);
-          if (cleanDesc && !edited.includes('synopsis') && (!item.synopsis || item.synopsis.trim() === '' || forceAll)) {
-            item.synopsis = cleanDesc;
-          }
-
-          // Poster fallback if missing
-          if (!item.image && (media.coverImage?.extraLarge || media.coverImage?.large)) {
-            item.image = media.coverImage.extraLarge || media.coverImage.large;
-          }
-
-          // Total episodes if missing
-          if (media.episodes && (!item.totalUnits || item.totalUnits === 12)) {
-            item.totalUnits = media.episodes;
-            if (item.status === 'Completed') item.progress = media.episodes;
-          }
-
-          if (media.format === 'MOVIE') {
-            item.category   = 'Movies';
-            item.unitName   = 'movie';
-            item.totalUnits = 1;
-            if (item.status === 'Completed') item.progress = 1;
-          }
-
-          item.updatedAt = Date.now();
-          updatedCount++;
-        });
-
-        if (typeof saveItems === 'function') saveItems();
-        if (typeof renderLibrary === 'function') renderLibrary();
+        }
+        batchSuccess = true;
       }
     } catch (err) {
-      // Continue next batch smoothly
+      batchSuccess = false;
     }
 
+    // Single-query fallback if batch encountered an error
+    if (!batchSuccess) {
+      for (const item of batch) {
+        if (state.enrichStopRequested) break;
+        const candidates = await fetchSingleAniList(item);
+        const media = pickBestAniListMedia(candidates, item);
+        if (media) {
+          if (applyAniListMedia(item, media, forceAll)) updatedCount++;
+        } else {
+          const wikiUpdated = await fetchWikiFallback(item);
+          if (wikiUpdated) updatedCount++;
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+
+    if (typeof saveItems === 'function') saveItems();
+    if (typeof renderLibrary === 'function') renderLibrary();
+
     processed += batch.length;
-    await new Promise((r) => setTimeout(r, 650));
+    await new Promise((r) => setTimeout(r, 500));
   }
 
   if (progressBar) progressBar.style.width = '100%';
@@ -362,6 +538,6 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
   if (typeof saveItems === 'function') saveItems();
   if (typeof renderAll === 'function') renderAll();
   if (typeof showToast === 'function') {
-    showToast(`Enriched ${updatedCount} entries with Studio, Release Date & Synopsis!`);
+    showToast(`Enriched ${updatedCount} entries with Studio, Release Date, Genres & Titles!`);
   }
 }

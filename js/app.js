@@ -228,22 +228,27 @@ function renderNavigation() {
   }
   const genreCount = genreSet.size;
 
-  // Update counts in desktop nav and tome menu
-  const libCountEl  = document.getElementById('menuLibraryCount');
-  const calCountEl  = document.getElementById('menuCalendarCount');
-  const genreCountEl = document.getElementById('menuGenreCount');
-  if (libCountEl)  libCountEl.textContent  = libCount;
-  if (calCountEl)  calCountEl.textContent  = datedCount;
-  if (genreCountEl) genreCountEl.textContent = genreCount;
+  // Update counts in logo dropdown View Types bar (User Request 1)
+  const tomeLibCount   = document.getElementById('tomeNavLibraryCount');
+  const tomeCalCount   = document.getElementById('tomeNavCalendarCount');
+  const tomeGenreCount = document.getElementById('tomeNavGenreCount');
+  if (tomeLibCount)   tomeLibCount.textContent   = libCount;
+  if (tomeCalCount)   tomeCalCount.textContent   = datedCount;
+  if (tomeGenreCount) tomeGenreCount.textContent = genreCount;
 
-  const topLibCount   = document.getElementById('navLibraryCount');
-  const topCalCount   = document.getElementById('navCalendarCount');
-  const topGenreCount = document.getElementById('navGenreCount');
-  if (topLibCount)   topLibCount.textContent   = libCount;
-  if (topCalCount)   topCalCount.textContent   = datedCount;
-  if (topGenreCount) topGenreCount.textContent = genreCount;
+  // View Types active state in logo dropdown
+  const tomeNavLib   = document.getElementById('tomeNavLibrary');
+  const tomeNavCal   = document.getElementById('tomeNavCalendar');
+  const tomeNavGenre = document.getElementById('tomeNavGenre');
 
-  // Desktop Primary Navigation Tabs active state (N1)
+  const tomeActiveCls   = 'w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition bg-[#ff9f1c]/15 text-[#ff9f1c] border border-[#ff9f1c]/30 shadow-sm';
+  const tomeInactiveCls = 'w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:bg-[#364146] transition';
+
+  if (tomeNavLib)   tomeNavLib.className   = (state.view === 'library')  ? tomeActiveCls : tomeInactiveCls;
+  if (tomeNavCal)   tomeNavCal.className   = (state.view === 'calendar') ? tomeActiveCls : tomeInactiveCls;
+  if (tomeNavGenre) tomeNavGenre.className = (state.view === 'genre')    ? tomeActiveCls : tomeInactiveCls;
+
+  // Desktop Primary Navigation Tabs active state (if present)
   const topNavLib   = document.getElementById('topNavLibrary');
   const topNavCal   = document.getElementById('topNavCalendar');
   const topNavGenre = document.getElementById('topNavGenre');
@@ -263,6 +268,50 @@ function renderNavigation() {
   if (mNavLib)   mNavLib.className   = `flex flex-col items-center gap-0.5 ${state.view === 'library' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
   if (mNavCal)   mNavCal.className   = `flex flex-col items-center gap-0.5 ${state.view === 'calendar' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
   if (mNavGenre) mNavGenre.className = `flex flex-col items-center gap-0.5 ${state.view === 'genre' ? 'text-[#ff9f1c]' : 'text-slate-400 hover:text-white'}`;
+
+  // Actions Tab: Category Filters Dropdown (User Requests 2 & 3)
+  const curCatLabel = document.getElementById('currentCategoryLabel');
+  if (curCatLabel) {
+    curCatLabel.textContent = state.category === 'All' ? 'All Categories' : state.category;
+  }
+
+  const catFilterList = document.getElementById('categoryFilterList');
+  if (catFilterList) {
+    const categoryIcons = {
+      'All': '✨',
+      'Series & Anime': '📺',
+      'Movies': '🎬',
+      'Games': '🎮',
+      'Books': '📖'
+    };
+    catFilterList.innerHTML = CATEGORIES.map((cat) => {
+      const active = state.category === cat;
+      const count = cat === 'All'
+        ? state.items.length
+        : state.items.filter((i) => i.category === cat).length;
+      const icon = categoryIcons[cat] || '📁';
+      return `
+        <button
+          type="button"
+          data-action="set-category"
+          data-category="${esc(cat)}"
+          class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition ${
+            active
+              ? 'bg-[#ff9f1c] text-[#0d0e11] font-bold shadow-sm'
+              : 'text-slate-200 hover:bg-[#364146] font-medium'
+          }"
+        >
+          <span class="flex items-center gap-2">
+            <span>${icon}</span>
+            <span>${esc(cat)}</span>
+          </span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded font-mono ${
+            active ? 'bg-[#0d0e11]/20 text-[#0d0e11] font-bold' : 'bg-[#0d0e11] text-slate-400'
+          }">${count}</span>
+        </button>
+      `;
+    }).join('');
+  }
 
   const catNav = document.getElementById('categoryNav');
   if (catNav) {
@@ -1734,6 +1783,9 @@ function openMediaModal(item = null, presetDate = '') {
     if (endRow)      endRow.classList.add('hidden');
   }
 
+  state.currentModalTitleEnglish = item?.titleEnglish || '';
+  state.currentModalTitleRomaji  = item?.titleRomaji || '';
+
   if (item) {
     document.getElementById('modalTitle').textContent     = 'Edit Media';
     document.getElementById('fieldId').value              = item.id;
@@ -1872,9 +1924,14 @@ function saveMediaFromModal() {
   if (genres.length > 0) manualFields.add('genres');
   if (document.getElementById('fieldSynopsis').value.trim()) manualFields.add('synopsis');
 
+  const titleEnglish = state.currentModalTitleEnglish || existingItem?.titleEnglish || '';
+  const titleRomaji  = state.currentModalTitleRomaji  || existingItem?.titleRomaji  || '';
+
   const entry = {
     id,
     title,
+    titleEnglish,
+    titleRomaji,
     category,
     status,
     rating,
@@ -1983,6 +2040,7 @@ document.addEventListener('click', async (e) => {
     renderAll();
   } else if (action === 'set-category') {
     state.category = btn.dataset.category;
+    if (moreActions) moreActions.classList.add('hidden');
     renderAll();
   } else if (action === 'set-status') {
     state.status = btn.dataset.status;
@@ -2179,7 +2237,14 @@ document.addEventListener('click', async (e) => {
   } else if (action === 'pick-search-result') {
     const r = (window._lastSearchResults || [])[parseInt(btn.dataset.idx, 10)];
     if (r) {
-      document.getElementById('fieldTitle').value      = r.title || '';
+      state.currentModalTitleEnglish = r.titleEnglish || '';
+      state.currentModalTitleRomaji  = r.titleRomaji || '';
+
+      const chosenTitle = (state.titleLang === 'romaji')
+        ? (r.titleRomaji || r.titleEnglish || r.title || '')
+        : (r.titleEnglish || r.titleRomaji || r.title || '');
+
+      document.getElementById('fieldTitle').value      = chosenTitle;
       document.getElementById('fieldCategory').value   = r.category || 'Series & Anime';
       document.getElementById('fieldTotalUnits').value  = r.totalUnits || 12;
       document.getElementById('fieldProgress').value    = document.getElementById('fieldStatus').value === 'Completed' ? (r.totalUnits || 12) : 0;
@@ -2716,6 +2781,8 @@ if (impFile) {
   impFile.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const dropdown = document.getElementById('tomeDropdown');
+    if (dropdown) dropdown.classList.add('hidden');
     importLibraryJSON(file);
     e.target.value = '';
   });

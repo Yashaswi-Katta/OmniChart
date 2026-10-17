@@ -116,73 +116,76 @@ const OwnerMode = {
 // Recovery map for short anime titles that LiveChart poster overlays
 // overwrote with "TV (JP)Released"
 // ---------------------------------------------------------------------------
+// Recovery map for short anime titles that LiveChart poster overlays
+// overwrote with "TV (JP)Released", with English & Romaji titles (L7)
+// ---------------------------------------------------------------------------
 const LIVECHART_ID_TITLE_RECOVERY = {
-  'lc-321':   'One Piece',
-  'lc-3340':  'Bleach',
-  'lc-3437':  'Death Note',
-  'lc-3585':  'Naruto',
-  'lc-3632':  'Dragon Ball Z',
-  'lc-2478':  'Black Clover',
-  'lc-3612':  'Black Lagoon',
-  'lc-9984':  'A Will Eternal',
-  'lc-10257': 'Chainsaw Man',
-  'lc-12428': 'DAN DA DAN',
-  'lc-9680':  'JUJUTSU KAISEN',
-  'lc-10491': 'JUJUTSU KAISEN 0',
-  'lc-11320': 'Solo Leveling',
-  'lc-11247': 'Oshi no Ko',
-  'lc-3169':  'Vinland Saga',
-  'lc-10456': 'SPY x FAMILY',
-  'lc-10042': 'Cyberpunk: Edgerunners',
-  'lc-10687': 'BLUE LOCK',
-  'lc-11352': 'Kaiju No. 8',
-  'lc-3418':  'Cowboy Bebop',
-  'lc-8349':  'Dr. STONE',
-  'lc-8355':  'Fire Force',
-  'lc-412':   'Tokyo Ghoul',
-  'lc-9793':  'Tower of God',
-  'lc-3168':  'Dororo',
-  'lc-956':   'PSYCHO-PASS',
-  'lc-3109':  'Goblin Slayer',
-  'lc-1241':  'Blue Exorcist',
-  'lc-154':   'Noragami',
-  'lc-1481':  'Drifters',
-  'lc-11916': 'WIND BREAKER',
-  'lc-10891': 'Chained Soldier',
-  'lc-11714': 'Go! Go! Loser Ranger!',
-  'lc-10281': 'Record of Ragnarok',
-  'lc-10754': 'Record of Ragnarok II',
-  'lc-13083': 'Record of Ragnarok III',
-  'lc-11088': 'Baki Hanma',
-  'lc-11380': 'Baki Hanma Season 2',
-  'lc-4603':  'Mo Dao Zu Shi',
-  'lc-10083': 'Scissor Seven Season 2',
-  'lc-10512': "JoJo's Bizarre Adventure: Stone Ocean",
-  'lc-10156': 'Horimiya',
-  'lc-9501':  'ID: INVADED',
-  'lc-1344':  'Charlotte',
-  'lc-1280':  'Death Parade',
-  'lc-2585':  'DEVILMAN crybaby',
-  'lc-3582':  'Elfen Lied',
-  'lc-3583':  'Tengen Toppa Gurren Lagann',
-  'lc-1936':  'Mob Psycho 100',
-  'lc-784':   'Overlord',
-  'lc-2574':  'Overlord II',
-  'lc-3206':  'Overlord III',
-  'lc-752':   'Plastic Memories',
-  'lc-1956':  'Your Name.',
-  'lc-3399':  'A Silent Voice',
-  'lc-401':   'Akame ga Kill!',
-  'lc-3627':  'Future Diary',
-  'lc-12331': 'Dragon Raja',
-  'lc-11377': 'Undead Unluck',
-  'lc-12917': 'SAKAMOTO DAYS',
-  'lc-12697': 'Gachiakuta',
-  'lc-12601': 'ZENSHU',
-  'lc-12651': 'Tougen Anki',
-  'lc-11225': 'Ninja Kamui',
-  'lc-9563':  'Kengan Ashura',
-  'lc-1580':  'Kakegurui'
+  'lc-321':   { title: 'One Piece', english: 'One Piece', romaji: 'One Piece' },
+  'lc-3340':  { title: 'Bleach', english: 'Bleach', romaji: 'Bleach' },
+  'lc-3437':  { title: 'Death Note', english: 'Death Note', romaji: 'Death Note' },
+  'lc-3585':  { title: 'Naruto', english: 'Naruto', romaji: 'Naruto' },
+  'lc-3632':  { title: 'Dragon Ball Z', english: 'Dragon Ball Z', romaji: 'Dragon Ball Z' },
+  'lc-2478':  { title: 'Black Clover', english: 'Black Clover', romaji: 'Black Clover' },
+  'lc-3612':  { title: 'Black Lagoon', english: 'Black Lagoon', romaji: 'Black Lagoon' },
+  'lc-9984':  { title: 'A Will Eternal', english: 'A Will Eternal', romaji: 'Yi Nian Yong Heng' },
+  'lc-10257': { title: 'Chainsaw Man', english: 'Chainsaw Man', romaji: 'Chainsaw Man' },
+  'lc-12428': { title: 'DAN DA DAN', english: 'DAN DA DAN', romaji: 'Dandadan' },
+  'lc-9680':  { title: 'JUJUTSU KAISEN', english: 'JUJUTSU KAISEN', romaji: 'Jujutsu Kaisen' },
+  'lc-10491': { title: 'JUJUTSU KAISEN 0', english: 'JUJUTSU KAISEN 0', romaji: 'Gekijouban Jujutsu Kaisen 0' },
+  'lc-11320': { title: 'Solo Leveling', english: 'Solo Leveling', romaji: 'Ore dake Level Up na Ken' },
+  'lc-11247': { title: 'Oshi no Ko', english: '[Oshi No Ko]', romaji: 'Oshi no Ko' },
+  'lc-3169':  { title: 'Vinland Saga', english: 'Vinland Saga', romaji: 'Vinland Saga' },
+  'lc-10456': { title: 'SPY x FAMILY', english: 'SPY x FAMILY', romaji: 'SPY x FAMILY' },
+  'lc-10042': { title: 'Cyberpunk: Edgerunners', english: 'Cyberpunk: Edgerunners', romaji: 'Cyberpunk: Edgerunners' },
+  'lc-10687': { title: 'BLUE LOCK', english: 'BLUELOCK', romaji: 'Blue Lock' },
+  'lc-11352': { title: 'Kaiju No. 8', english: 'Kaiju No.8', romaji: 'Kaijuu 8-gou' },
+  'lc-3418':  { title: 'Cowboy Bebop', english: 'Cowboy Bebop', romaji: 'Cowboy Bebop' },
+  'lc-8349':  { title: 'Dr. STONE', english: 'Dr. STONE', romaji: 'Dr. Stone' },
+  'lc-8355':  { title: 'Fire Force', english: 'Fire Force', romaji: 'Enen no Shouboutai' },
+  'lc-412':   { title: 'Tokyo Ghoul', english: 'Tokyo Ghoul', romaji: 'Tokyo Ghoul' },
+  'lc-9793':  { title: 'Tower of God', english: 'Tower of God', romaji: 'Kami no Tou: Tower of God' },
+  'lc-3168':  { title: 'Dororo', english: 'Dororo', romaji: 'Dororo' },
+  'lc-956':   { title: 'PSYCHO-PASS', english: 'PSYCHO-PASS', romaji: 'Psycho-Pass' },
+  'lc-3109':  { title: 'Goblin Slayer', english: 'Goblin Slayer', romaji: 'Goblin Slayer' },
+  'lc-1241':  { title: 'Blue Exorcist', english: 'Blue Exorcist', romaji: 'Ao no Exorcist' },
+  'lc-154':   { title: 'Noragami', english: 'Noragami: Stray God', romaji: 'Noragami' },
+  'lc-1481':  { title: 'Drifters', english: 'Drifters', romaji: 'Drifters' },
+  'lc-11916': { title: 'WIND BREAKER', english: 'WIND BREAKER', romaji: 'Wind Breaker' },
+  'lc-10891': { title: 'Chained Soldier', english: 'Chained Soldier', romaji: 'Mato Seihei no Slave' },
+  'lc-11714': { title: 'Go! Go! Loser Ranger!', english: 'Go! Go! Loser Ranger!', romaji: 'Sentai Daishikkaku' },
+  'lc-10281': { title: 'Record of Ragnarok', english: 'Record of Ragnarok', romaji: 'Shuumatsu no Valkyrie' },
+  'lc-10754': { title: 'Record of Ragnarok II', english: 'Record of Ragnarok II', romaji: 'Shuumatsu no Valkyrie II' },
+  'lc-13083': { title: 'Record of Ragnarok III', english: 'Record of Ragnarok III', romaji: 'Shuumatsu no Valkyrie III' },
+  'lc-11088': { title: 'Baki Hanma', english: 'Baki Hanma', romaji: 'Hanma Baki: Son of Ogre' },
+  'lc-11380': { title: 'Baki Hanma Season 2', english: 'Baki Hanma Season 2', romaji: 'Hanma Baki 2nd Season' },
+  'lc-4603':  { title: 'Mo Dao Zu Shi', english: 'The Founder of Diabolism', romaji: 'Mo Dao Zu Shi' },
+  'lc-10083': { title: 'Scissor Seven Season 2', english: 'Scissor Seven Season 2', romaji: 'Cike Wu Liuqi 2nd Season' },
+  'lc-10512': { title: "JoJo's Bizarre Adventure: Stone Ocean", english: "JoJo's Bizarre Adventure: STONE OCEAN", romaji: "JoJo no Kimyou na Bouken: Stone Ocean" },
+  'lc-10156': { title: 'Horimiya', english: 'Horimiya', romaji: 'Horimiya' },
+  'lc-9501':  { title: 'ID: INVADED', english: 'ID: INVADED', romaji: 'Id:Invaded' },
+  'lc-1344':  { title: 'Charlotte', english: 'Charlotte', romaji: 'Charlotte' },
+  'lc-1280':  { title: 'Death Parade', english: 'Death Parade', romaji: 'Death Parade' },
+  'lc-2585':  { title: 'DEVILMAN crybaby', english: 'Devilman: Crybaby', romaji: 'Devilman Crybaby' },
+  'lc-3582':  { title: 'Elfen Lied', english: 'Elfen Lied', romaji: 'Elfen Lied' },
+  'lc-3583':  { title: 'Tengen Toppa Gurren Lagann', english: 'Gurren Lagann', romaji: 'Tengen Toppa Gurren Lagann' },
+  'lc-1936':  { title: 'Mob Psycho 100', english: 'Mob Psycho 100', romaji: 'Mob Psycho 100' },
+  'lc-784':   { title: 'Overlord', english: 'Overlord', romaji: 'Overlord' },
+  'lc-2574':  { title: 'Overlord II', english: 'Overlord II', romaji: 'Overlord II' },
+  'lc-3206':  { title: 'Overlord III', english: 'Overlord III', romaji: 'Overlord III' },
+  'lc-752':   { title: 'Plastic Memories', english: 'Plastic Memories', romaji: 'Plastic Memories' },
+  'lc-1956':  { title: 'Your Name.', english: 'Your Name.', romaji: 'Kimi no Na wa.' },
+  'lc-3399':  { title: 'A Silent Voice', english: 'A Silent Voice', romaji: 'Koe no Katachi' },
+  'lc-401':   { title: 'Akame ga Kill!', english: 'Akame ga Kill!', romaji: 'Akame ga Kill!' },
+  'lc-3627':  { title: 'Future Diary', english: 'The Future Diary', romaji: 'Mirai Nikki' },
+  'lc-12331': { title: 'Dragon Raja', english: 'Dragon Raja', romaji: 'Long Zu' },
+  'lc-11377': { title: 'Undead Unluck', english: 'Undead Unluck', romaji: 'Undead Unluck' },
+  'lc-12917': { title: 'SAKAMOTO DAYS', english: 'Sakamoto Days', romaji: 'Sakamoto Days' },
+  'lc-12697': { title: 'Gachiakuta', english: 'Gachiakuta', romaji: 'Gachiakuta' },
+  'lc-12601': { title: 'ZENSHU', english: 'Zenshu.', romaji: 'Zenshuu.' },
+  'lc-12651': { title: 'Tougen Anki', english: 'Tougen Anki: Dark Demon of Tougen', romaji: 'Tougen Anki' },
+  'lc-11225': { title: 'Ninja Kamui', english: 'Ninja Kamui', romaji: 'Ninja Kamui' },
+  'lc-9563':  { title: 'Kengan Ashura', english: 'Kengan Ashura', romaji: 'Kengan Ashura' },
+  'lc-1580':  { title: 'Kakegurui', english: 'Kakegurui', romaji: 'Kakegurui' }
 };
 
 // ---------------------------------------------------------------------------
@@ -213,10 +216,25 @@ function sanitizeAndRecoverItems(list) {
       item.consumedDate = '';
       changed = true;
     }
-    // Recover known broken LiveChart titles
-    if (isBrokenTitle(item.title) && LIVECHART_ID_TITLE_RECOVERY[item.id]) {
-      item.title = LIVECHART_ID_TITLE_RECOVERY[item.id];
-      changed = true;
+    // Recover known broken LiveChart titles and supply English / Romaji titles (L7)
+    if (LIVECHART_ID_TITLE_RECOVERY[item.id]) {
+      const rec = LIVECHART_ID_TITLE_RECOVERY[item.id];
+      const recTitle = (typeof rec === 'object' && rec.title) ? rec.title : rec;
+      const recEng   = (typeof rec === 'object' && rec.english) ? rec.english : '';
+      const recRom   = (typeof rec === 'object' && rec.romaji) ? rec.romaji : '';
+
+      if (isBrokenTitle(item.title) && recTitle) {
+        item.title = recTitle;
+        changed = true;
+      }
+      if (recEng && !item.titleEnglish) {
+        item.titleEnglish = recEng;
+        changed = true;
+      }
+      if (recRom && !item.titleRomaji) {
+        item.titleRomaji = recRom;
+        changed = true;
+      }
     }
     // Normalize status names: Watching -> Ongoing, Plan to Watch -> Planning
     const norm = normalizeStatus(item.status);
@@ -341,12 +359,19 @@ function importLibraryJSON(file) {
       for (const raw of imported) {
         if (!raw || !raw.title) continue;
         const id = raw.id || ('imp-' + Math.random().toString(36).slice(2, 9));
-        const recoveredTitle = isBrokenTitle(raw.title) && LIVECHART_ID_TITLE_RECOVERY[id]
-          ? LIVECHART_ID_TITLE_RECOVERY[id]
+        const rec = LIVECHART_ID_TITLE_RECOVERY[id];
+        const recTitle = (typeof rec === 'object' && rec.title) ? rec.title : rec;
+        const recEng   = (typeof rec === 'object' && rec.english) ? rec.english : '';
+        const recRom   = (typeof rec === 'object' && rec.romaji) ? rec.romaji : '';
+
+        const recoveredTitle = isBrokenTitle(raw.title) && recTitle
+          ? recTitle
           : raw.title;
         byId.set(id, {
           id,
           title:        recoveredTitle,
+          titleEnglish: raw.titleEnglish || recEng || '',
+          titleRomaji:  raw.titleRomaji  || recRom || '',
           category:     raw.category || 'Series & Anime',
           status:       normalizeStatus(raw.status),
           rating:       Number(raw.rating || 0),
