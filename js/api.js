@@ -6,17 +6,21 @@
    ========================================================================== */
 
 // ---------------------------------------------------------------------------
-// Shared Utility Helpers
+// Shared Utility Helpers & AniList GraphQL Fragment
 // ---------------------------------------------------------------------------
 
-function esc(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+const ANILIST_MEDIA_FIELDS = `
+  title { english romaji native }
+  season
+  seasonYear
+  startDate { year }
+  episodes
+  format
+  genres
+  description(asHtml: false)
+  studios { nodes { name isAnimationStudio } }
+  coverImage { extraLarge large }
+`;
 
 function makeFallbackPoster(title) {
   const clean = (title || 'Media').slice(0, 22);
@@ -114,16 +118,7 @@ async function runAutoSearch(query) {
       query: `query ($s: String) {
         Page(perPage: 5) {
           media(search: $s, type: ANIME) {
-            title { english romaji }
-            season
-            seasonYear
-            startDate { year }
-            episodes
-            format
-            genres
-            description(asHtml: false)
-            studios { nodes { name isAnimationStudio } }
-            coverImage { extraLarge large }
+            ${ANILIST_MEDIA_FIELDS}
           }
         }
       }`,
@@ -350,20 +345,10 @@ async function fetchWikiFallback(item) {
 /** Individual single query fallback if a batch query fails */
 async function fetchSingleAniList(item) {
   const cleanTitle = getCleanSearchTitle(item.title);
-  const safeSearch = cleanTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const q = `query {
+  const q = `query ($s: String) {
     Page(perPage: 3) {
-      media(search: "${safeSearch}", type: ANIME) {
-        title { english romaji native }
-        season
-        seasonYear
-        startDate { year }
-        episodes
-        format
-        genres
-        description(asHtml: false)
-        studios { nodes { name isAnimationStudio } }
-        coverImage { extraLarge large }
+      media(search: $s, type: ANIME) {
+        ${ANILIST_MEDIA_FIELDS}
       }
     }
   }`;
@@ -371,7 +356,7 @@ async function fetchSingleAniList(item) {
     const res = await fetch('https://graphql.anilist.co', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ query: q })
+      body: JSON.stringify({ query: q, variables: { s: cleanTitle } })
     });
     if (res.ok) {
       const json = await res.json();
@@ -438,30 +423,20 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
       statusText.textContent = `⚡ [AniList] Auto-filling Studio, Release Date, Genres & Titles (${processed} / ${targets.length})...`;
     }
 
-    const queryFields = batch.map((item, idx) => {
-      const cleanTitle = getCleanSearchTitle(item.title);
-      const safeSearch = cleanTitle
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/\s+/g, ' ')
-        .trim();
-      return `q${idx}: Page(perPage: 3) {
-        media(search: "${safeSearch}", type: ANIME) {
-          title { english romaji native }
-          season
-          seasonYear
-          startDate { year }
-          episodes
-          format
-          genres
-          description(asHtml: false)
-          studios { nodes { name isAnimationStudio } }
-          coverImage { extraLarge large }
+    const varDefs = batch.map((_, idx) => `$s${idx}: String`).join(', ');
+    const queryFields = batch.map((_, idx) => `
+      q${idx}: Page(perPage: 3) {
+        media(search: $s${idx}, type: ANIME) {
+          ${ANILIST_MEDIA_FIELDS}
         }
-      }`;
-    });
+      }
+    `).join('\n');
 
-    const fullQuery = `query {\n${queryFields.join('\n')}\n}`;
+    const variables = Object.fromEntries(
+      batch.map((item, idx) => [`s${idx}`, getCleanSearchTitle(item.title)])
+    );
+
+    const fullQuery = `query (${varDefs}) {\n${queryFields}\n}`;
     let batchSuccess = false;
 
     try {
@@ -471,7 +446,7 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
           'Content-Type': 'application/json',
           'Accept':       'application/json'
         },
-        body: JSON.stringify({ query: fullQuery })
+        body: JSON.stringify({ query: fullQuery, variables })
       });
 
       // Handle AniList rate limit gracefully
@@ -480,7 +455,7 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
         res = await fetch('https://graphql.anilist.co', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ query: fullQuery })
+          body: JSON.stringify({ query: fullQuery, variables })
         });
       }
 
@@ -525,7 +500,7 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
       }
     }
 
-    if (typeof saveItems === 'function') saveItems();
+    if (typeof saveItems === 'function') saveItems(false);
     if (typeof renderLibrary === 'function') renderLibrary();
 
     processed += batch.length;
@@ -535,7 +510,7 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
   if (progressBar) progressBar.style.width = '100%';
   state.enrichRunning = false;
   if (banner) setTimeout(() => banner.classList.add('hidden'), 1200);
-  if (typeof saveItems === 'function') saveItems();
+  if (typeof saveItems === 'function') saveItems(true);
   if (typeof renderAll === 'function') renderAll();
   if (typeof showToast === 'function') {
     showToast(`Enriched ${updatedCount} entries with Studio, Release Date, Genres & Titles!`);

@@ -138,14 +138,12 @@ function getItemTitle(item) {
     return item.titleRomaji.trim();
   }
   // Instant fallback to canonical bilingual dictionary or LiveChart recovery
-  if (typeof lookupBilingualTitle === 'function') {
-    const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
-    if (match) {
-      if (match.english && !item.titleEnglish) item.titleEnglish = match.english;
-      if (match.romaji && !item.titleRomaji) item.titleRomaji = match.romaji;
-      if (lang === 'english' && match.english) return match.english;
-      if (lang === 'romaji' && match.romaji) return match.romaji;
-    }
+  const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
+  if (match) {
+    if (match.english && !item.titleEnglish) item.titleEnglish = match.english;
+    if (match.romaji && !item.titleRomaji) item.titleRomaji = match.romaji;
+    if (lang === 'english' && match.english) return match.english;
+    if (lang === 'romaji' && match.romaji) return match.romaji;
   }
   return item.title || '';
 }
@@ -177,14 +175,22 @@ function getFilteredItems() {
       if (state.status === 'Favorites') {
         if (!item.favorite) return false;
       } else {
-        const itemStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+        const itemStatus = normalizeStatus(item.status);
         if (itemStatus !== state.status) return false;
+      }
+    }
+    if (state.scoreFilter !== null && state.scoreFilter !== undefined) {
+      const r = Number(item.rating) || 0;
+      if (state.scoreFilter === 0) {
+        if (r > 0) return false;
+      } else {
+        if (Math.round(r) !== state.scoreFilter) return false;
       }
     }
     if (q) {
       let eng = item.titleEnglish || '';
       let rom = item.titleRomaji || '';
-      if ((!eng || !rom) && typeof lookupBilingualTitle === 'function') {
+      if (!eng || !rom) {
         const m = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
         if (m) {
           if (!eng && m.english) eng = m.english;
@@ -275,22 +281,10 @@ function renderNavigation() {
   if (tomeNavStats) tomeNavStats.className = (state.view === 'stats') ? tomeActiveCls : tomeInactiveCls;
   if (tomeNavStatsCount) {
     const total = state.items.length;
-    const completed = state.items.filter(i => (typeof normalizeStatus === 'function' ? normalizeStatus(i.status) : i.status) === 'Completed').length;
+    const completed = state.items.filter(i => normalizeStatus(i.status) === 'Completed').length;
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
     tomeNavStatsCount.textContent = `${pct}%`;
   }
-
-  // Desktop Primary Navigation Tabs active state (if present)
-  const topNavLib   = document.getElementById('topNavLibrary');
-  const topNavCal   = document.getElementById('topNavCalendar');
-  const topNavGenre = document.getElementById('topNavGenre');
-
-  const topActiveCls   = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-[#2c3539] text-[#ff9f1c] border border-[#3d494f] shadow-sm';
-  const topInactiveCls = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#364146] transition flex items-center gap-1.5';
-
-  if (topNavLib)   topNavLib.className   = (state.view === 'library')  ? topActiveCls : topInactiveCls;
-  if (topNavCal)   topNavCal.className   = (state.view === 'calendar') ? topActiveCls : topInactiveCls;
-  if (topNavGenre) topNavGenre.className = (state.view === 'genre')    ? topActiveCls : topInactiveCls;
 
   // Mobile Bottom Navigation active state (N1 Mobile)
   const mNavLib   = document.getElementById('mobileNavLibrary');
@@ -347,28 +341,12 @@ function renderNavigation() {
     }).join('');
   }
 
-  const catNav = document.getElementById('categoryNav');
-  if (catNav) {
-    catNav.innerHTML = CATEGORIES.map((cat) => {
-      const active = state.category === cat;
-      return `<button
-        data-action="set-category"
-        data-category="${esc(cat)}"
-        class="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-          active
-            ? 'bg-[#ff9f1c] text-[#0d0e11] shadow'
-            : 'bg-[#2c3539] text-slate-300 hover:text-white border border-[#3d494f]'
-        }"
-      >${esc(cat)}</button>`;
-    }).join('');
-  }
-
   const statusTabs = document.getElementById('statusTabs');
   if (statusTabs) {
     const tabsHtml = STATUSES.map((st) => {
       const count = state.items.filter((i) => {
         if (state.category !== 'All' && i.category !== state.category) return false;
-        const itemStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(i.status) : i.status;
+        const itemStatus = normalizeStatus(i.status);
         return st === 'All' ? true : itemStatus === st;
       }).length;
       const active = state.status === st;
@@ -616,14 +594,6 @@ function openAuthModal(activeTab = 'account') {
 }
 window.openAuthModal = openAuthModal;
 
-function switchAuthTab(tab) {
-  state.authTab = tab;
-  const accountView = state.user ? document.getElementById('authLoggedInView') : document.getElementById('authLoggedOutView');
-  const setupView   = document.getElementById('authSetupView');
-  if (setupView) setupView.classList.add('hidden');
-  if (accountView) accountView.classList.remove('hidden');
-}
-
 // ---------------------------------------------------------------------------
 // Library Card Grid (With Interactive Popped-Out Genre Badges)
 // ---------------------------------------------------------------------------
@@ -692,7 +662,7 @@ function renderLibrary() {
       const pct           = Math.min(100, Math.round((progress / total) * 100));
       const isSelected    = state.selectedIds.has(item.id);
       const posterSrc     = item.image || makeFallbackPoster(item.title);
-      const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+      const displayStatus = normalizeStatus(item.status);
       const displayTitle  = getItemTitle(item);
       const cleanStudio   = Array.from(new Set((item.studio || 'Unknown Studio').split(',').map((s) => s.trim()).filter(Boolean))).join(', ') || 'Unknown Studio';
 
@@ -822,7 +792,7 @@ function renderLibrary() {
         : (item.synopsis || 'No synopsis available.');
       const isSelected    = state.selectedIds.has(item.id);
       const posterSrc     = item.image || makeFallbackPoster(item.title);
-      const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+      const displayStatus = normalizeStatus(item.status);
       const displayTitle  = getItemTitle(item);
       const cleanStudio   = Array.from(new Set((item.studio || 'Unknown Studio').split(',').map((s) => s.trim()).filter(Boolean))).join(', ') || 'Unknown Studio';
       const isExpanded    = state.expandedSynopses?.has(item.id);
@@ -1171,7 +1141,7 @@ function renderCalendar() {
   if (quickTray) {
     const isOwner = OwnerMode.isOwner();
     const undatedCompleted = state.items.filter((i) => {
-      const st = (typeof normalizeStatus === 'function') ? normalizeStatus(i.status) : i.status;
+      const st = normalizeStatus(i.status);
       return st === 'Completed' && (!i.consumedDate || !i.consumedDate.trim());
     });
 
@@ -1401,10 +1371,7 @@ function renderGenreView() {
     const avgRating = ratedItems.length > 0
       ? (ratedItems.reduce((acc, i) => acc + Number(i.rating), 0) / ratedItems.length)
       : 0;
-    const completedCount = entry.items.filter((i) => {
-      const st = (typeof normalizeStatus === 'function') ? normalizeStatus(i.status) : i.status;
-      return st === 'Completed';
-    }).length;
+    const completedCount = entry.items.filter((i) => normalizeStatus(i.status) === 'Completed').length;
     entry.avgRating = avgRating;
     entry.completedCount = completedCount;
 
@@ -1552,7 +1519,7 @@ function renderGenreView() {
             const rating = Number(item.rating || 0);
             const isMasterpiece = rating >= 9;
             const posterSrc = item.image || makeFallbackPoster(title);
-            const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+            const displayStatus = normalizeStatus(item.status);
             const progress = Number(item.progress || 0);
             const total = Math.max(1, Number(item.totalUnits || 1));
 
@@ -1713,7 +1680,7 @@ function renderStatsView() {
   // Status counts
   const statusCounts = { 'Completed': 0, 'Ongoing': 0, 'Planning': 0, 'On Hold': 0, 'Dropped': 0 };
   for (const item of items) {
-    const st = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status;
+    const st = normalizeStatus(item.status);
     if (statusCounts[st] !== undefined) statusCounts[st]++;
   }
 
@@ -1727,7 +1694,7 @@ function renderStatsView() {
     const prog = Number(item.progress) || 0;
     totalEpisodesWatched += prog;
     if (item.category === 'Movies') {
-      const isDone = ((typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : item.status) === 'Completed';
+      const isDone = normalizeStatus(item.status) === 'Completed';
       totalMinutes += isDone ? 115 : (prog * 115);
     } else if (item.category === 'Games') {
       totalMinutes += prog * 60;
@@ -2224,71 +2191,39 @@ function updateCategoryAwareFormFields() {
   const labelProg = document.getElementById('labelProgress');
   const labelStat = document.getElementById('labelStatus');
   const statusSel = document.getElementById('fieldStatus');
-  const curStatus = statusSel?.value || 'Ongoing';
   const totalUnits = document.getElementById('fieldTotalUnits');
+  const curStatus = normalizeStatus(statusSel?.value || 'Ongoing');
 
-  if (cat === 'Movies') {
-    if (labelProg) labelProg.textContent = 'Progress (Parts / Movies)';
-    if (labelStat) labelStat.textContent = 'Viewing Status';
-    if (totalUnits && (!totalUnits.value || totalUnits.value === '12')) {
-      totalUnits.value = '1';
-    }
-    if (statusSel) {
-      statusSel.innerHTML = `
-        <option value="Completed">Watched</option>
-        <option value="Ongoing">Watching</option>
-        <option value="On Hold">On Hold</option>
-        <option value="Planning">Planning</option>
-        <option value="Dropped">Dropped</option>
-      `;
-      statusSel.value = (curStatus === 'Completed' || curStatus === 'Watched') ? 'Completed' : curStatus;
-    }
-  } else if (cat === 'Games') {
-    if (labelProg) labelProg.textContent = 'Progress (Hours / Chapters)';
-    if (labelStat) labelStat.textContent = 'Playing Status';
-    if (statusSel) {
-      statusSel.innerHTML = `
-        <option value="Completed">Beaten / Finished</option>
-        <option value="Ongoing">Playing</option>
-        <option value="On Hold">On Hold</option>
-        <option value="Planning">Planning</option>
-        <option value="Dropped">Dropped</option>
-      `;
-      statusSel.value = (curStatus === 'Completed' || curStatus === 'Beaten') ? 'Completed' : curStatus;
-    }
-  } else if (cat === 'Books') {
-    if (labelProg) labelProg.textContent = 'Progress (Chapters / Pages)';
-    if (labelStat) labelStat.textContent = 'Reading Status';
-    if (statusSel) {
-      statusSel.innerHTML = `
-        <option value="Completed">Read</option>
-        <option value="Ongoing">Reading</option>
-        <option value="On Hold">On Hold</option>
-        <option value="Planning">Planning</option>
-        <option value="Dropped">Dropped</option>
-      `;
-      statusSel.value = (curStatus === 'Completed' || curStatus === 'Read') ? 'Completed' : curStatus;
-    }
-  } else {
-    // Series & Anime
-    if (labelProg) labelProg.textContent = 'Progress (Episodes)';
-    if (labelStat) labelStat.textContent = 'Watch Status';
-    if (statusSel) {
-      statusSel.innerHTML = `
-        <option value="Ongoing">Watching / Ongoing</option>
-        <option value="Completed">Completed</option>
-        <option value="On Hold">On Hold</option>
-        <option value="Planning">Planning</option>
-        <option value="Dropped">Dropped</option>
-      `;
-      statusSel.value = (curStatus === 'Watched' || curStatus === 'Beaten' || curStatus === 'Read') ? 'Completed' : curStatus;
-    }
+  const meta = {
+    'Movies': { prog: 'Progress (Parts / Movies)', stat: 'Viewing Status', done: 'Watched', active: 'Watching', order: ['Completed', 'Ongoing'] },
+    'Games': { prog: 'Progress (Hours / Chapters)', stat: 'Playing Status', done: 'Beaten / Finished', active: 'Playing', order: ['Completed', 'Ongoing'] },
+    'Books': { prog: 'Progress (Chapters / Pages)', stat: 'Reading Status', done: 'Read', active: 'Reading', order: ['Completed', 'Ongoing'] },
+    'Series & Anime': { prog: 'Progress (Episodes)', stat: 'Watch Status', done: 'Completed', active: 'Watching / Ongoing', order: ['Ongoing', 'Completed'] }
+  }[cat] || { prog: 'Progress (Episodes)', stat: 'Watch Status', done: 'Completed', active: 'Watching / Ongoing', order: ['Ongoing', 'Completed'] };
+
+  if (labelProg) labelProg.textContent = meta.prog;
+  if (labelStat) labelStat.textContent = meta.stat;
+  if (cat === 'Movies' && totalUnits && (!totalUnits.value || totalUnits.value === '12')) {
+    totalUnits.value = '1';
+  }
+
+  if (statusSel) {
+    const labels = {
+      Completed: meta.done,
+      Ongoing: meta.active,
+      'On Hold': 'On Hold',
+      Planning: 'Planning',
+      Dropped: 'Dropped'
+    };
+    statusSel.innerHTML = [...meta.order, 'On Hold', 'Planning', 'Dropped']
+      .map((val) => `<option value="${val}">${labels[val]}</option>`)
+      .join('');
+    statusSel.value = curStatus;
   }
 }
 
 function checkDuplicateTitle(title, currentId) {
   const warning = document.getElementById('duplicateTitleWarning');
-  const existingEl = document.getElementById('duplicateTitleExisting');
   if (!warning) return;
   const t = (title || '').trim().toLowerCase();
   if (!t) {
@@ -2297,7 +2232,6 @@ function checkDuplicateTitle(title, currentId) {
   }
   const match = state.items.find(i => i.id !== currentId && (i.title || '').trim().toLowerCase() === t);
   if (match) {
-    if (existingEl) existingEl.textContent = match.title;
     warning.classList.remove('hidden');
   } else {
     warning.classList.add('hidden');
@@ -2393,7 +2327,7 @@ function openMediaModal(item = null, presetDate = '') {
   state.currentModalTitleEnglish = item?.titleEnglish || '';
   state.currentModalTitleRomaji  = item?.titleRomaji || '';
 
-  if (item && (!state.currentModalTitleEnglish || !state.currentModalTitleRomaji) && typeof lookupBilingualTitle === 'function') {
+  if (item && (!state.currentModalTitleEnglish || !state.currentModalTitleRomaji)) {
     const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
     if (match) {
       if (!state.currentModalTitleEnglish && match.english) state.currentModalTitleEnglish = match.english;
@@ -2418,7 +2352,7 @@ function openMediaModal(item = null, presetDate = '') {
     }
     document.getElementById('fieldCategory').value         = catVal;
     updateCategoryAwareFormFields();
-    document.getElementById('fieldStatus').value           = (typeof normalizeStatus === 'function') ? normalizeStatus(item.status) : (item.status || 'Ongoing');
+    document.getElementById('fieldStatus').value           = normalizeStatus(item.status);
     document.getElementById('fieldRating').value           = item.rating ?? 0;
     document.getElementById('fieldProgress').value         = item.progress ?? 0;
     document.getElementById('fieldTotalUnits').value       = item.totalUnits ?? (catVal === 'Movies' ? 1 : 12);
@@ -2558,7 +2492,7 @@ function saveMediaFromModal() {
   const id         = document.getElementById('fieldId').value || ('id-' + Date.now());
   const category   = document.getElementById('fieldCategory').value;
   const rawStatus  = document.getElementById('fieldStatus').value;
-  const status     = (typeof normalizeStatus === 'function') ? normalizeStatus(rawStatus) : rawStatus;
+  const status     = normalizeStatus(rawStatus);
   const rating     = Math.min(10, Math.max(0, parseFloat(document.getElementById('fieldRating').value) || 0));
   const totalUnits = Math.max(1, parseInt(document.getElementById('fieldTotalUnits').value, 10) || 1);
   let   progress   = Math.max(0, parseInt(document.getElementById('fieldProgress').value, 10) || 0);
@@ -2581,7 +2515,7 @@ function saveMediaFromModal() {
   let titleRomaji  = (fieldRomEl ? fieldRomEl.value.trim() : '') || state.currentModalTitleRomaji  || existingItem?.titleRomaji  || '';
 
   // Auto-resolve bilingual titles from dictionary if still missing
-  if ((!titleEnglish || !titleRomaji) && typeof lookupBilingualTitle === 'function') {
+  if (!titleEnglish || !titleRomaji) {
     const match = lookupBilingualTitle(title) || lookupBilingualTitle(id);
     if (match) {
       if (!titleEnglish && match.english) titleEnglish = match.english;
@@ -2627,7 +2561,7 @@ function saveMediaFromModal() {
     state.items.unshift(entry);
   }
 
-  saveItems();
+  saveItems(true, entry);
   state.modalInitialSnapshot = null;
   document.getElementById('mediaModal').classList.add('hidden');
   renderAll();
@@ -2762,15 +2696,7 @@ async function loadImageSafe(rawUrl) {
   let img = await loadImgEl(primaryUrl, true, 3500);
   if (img) return img;
 
-  // Attempt C: Proxy fallback via wsrv.nl if not tried yet and not anilist/mal
-  if (!primaryUrl.includes('wsrv.nl') && !url.includes('anilist.co') && !url.includes('myanimelist.net')) {
-    const stripped = url.replace(/^https?:\/\//, '');
-    const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(stripped)}`;
-    img = await loadImgEl(proxyUrl, true, 3000);
-    if (img) return img;
-  }
-
-  // Attempt D: Fallback to direct load WITHOUT CORS
+  // Attempt C: Fallback to direct load WITHOUT CORS
   // Ensures poster ALWAYS renders visually on the canvas even if host blocks CORS
   img = await loadImgEl(url, false, 3000);
   if (img) return img;
@@ -2863,7 +2789,7 @@ async function renderShareCard() {
     ctx.fillText(`★  ${rating > 0 ? rating.toFixed(1) : 'Unrated'}`, contentX + 16, currY + 25);
 
     // Status Pill
-    const displayStatus = (typeof normalizeStatus === 'function') ? normalizeStatus(curItem.status) : curItem.status;
+    const displayStatus = normalizeStatus(curItem.status);
     ctx.fillStyle = '#0d0e11';
     roundRect(ctx, contentX + 155, currY, 110, 36, 10);
     ctx.fill();
@@ -3166,24 +3092,22 @@ function triggerTitleLangToggle() {
 
   // Self-healing pass: resolve any items missing English or Romaji titles
   let healed = false;
-  if (typeof lookupBilingualTitle === 'function') {
-    for (const item of state.items) {
-      if (!item.titleEnglish || !item.titleRomaji) {
-        const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
-        if (match) {
-          if (!item.titleEnglish && match.english) { item.titleEnglish = match.english; healed = true; }
-          if (!item.titleRomaji && match.romaji) { item.titleRomaji = match.romaji; healed = true; }
-        }
+  for (const item of state.items) {
+    if (!item.titleEnglish || !item.titleRomaji) {
+      const match = lookupBilingualTitle(item.title) || lookupBilingualTitle(item.id);
+      if (match) {
+        if (!item.titleEnglish && match.english) { item.titleEnglish = match.english; healed = true; }
+        if (!item.titleRomaji && match.romaji) { item.titleRomaji = match.romaji; healed = true; }
       }
     }
   }
-  if (healed && typeof saveItems === 'function') {
+  if (healed) {
     saveItems();
   }
 
   // If any items are still missing English or Romaji titles, kick off background enrichment
   const missingLangCount = state.items.filter((i) => !i.titleEnglish || !i.titleRomaji).length;
-  if (missingLangCount > 0 && typeof enrichMissingMetadata === 'function' && !state.enrichRunning) {
+  if (missingLangCount > 0 && !state.enrichRunning) {
     enrichMissingMetadata(false);
   }
 
@@ -3228,13 +3152,19 @@ document.addEventListener('click', async (e) => {
     renderAll();
   } else if (action === 'set-category') {
     state.category = btn.dataset.category;
+    state.scoreFilter = null;
+    state.renderLimit = 36;
     if (moreActions) moreActions.classList.add('hidden');
     renderAll();
   } else if (action === 'set-status') {
     state.status = btn.dataset.status;
+    state.scoreFilter = null;
+    state.renderLimit = 36;
     renderAll();
   } else if (action === 'clear-library-search') {
     state.search = '';
+    state.scoreFilter = null;
+    state.renderLimit = 36;
     const inp = document.getElementById('librarySearchInput');
     if (inp) inp.value = '';
     btn.classList.add('hidden');
@@ -3320,10 +3250,11 @@ document.addEventListener('click', async (e) => {
     }
   } else if (action === 'toggle-sort-dir') {
     state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    try { localStorage.setItem('omnichart_sort_dir', state.sortDir); } catch (err) {}
     renderNavigation();
     renderLibrary();
   } else if (action === 'toggle-cal-week-start') {
-    state.weekStart = state.weekStart === 'monday' ? 'sunday' : 'monday';
+    state.weekStart = state.weekStart === 'mon' ? 'sun' : 'mon';
     try { localStorage.setItem('omnichart_week_start', state.weekStart); } catch (e) {}
     renderCalendar();
   } else if (action === 'save-media') {
@@ -3335,7 +3266,7 @@ document.addEventListener('click', async (e) => {
     if (item) {
       item.favorite = !item.favorite;
       item.updatedAt = Date.now();
-      saveItems();
+      saveItems(true, item);
       renderNavigation();
       renderLibrary();
       showToast(item.favorite ? `Marked "${item.title}" as Favorite ★` : `Removed "${item.title}" from Favorites`);
@@ -3349,23 +3280,23 @@ document.addEventListener('click', async (e) => {
     renderLibrary();
   } else if (action === 'stats-filter-status') {
     state.status = btn.dataset.status;
+    state.scoreFilter = null;
+    state.renderLimit = 36;
     state.view = 'library';
     renderAll();
   } else if (action === 'stats-filter-score') {
     const score = parseInt(btn.dataset.score, 10);
     state.view = 'library';
     state.status = 'All';
-    if (score === 0) {
-      state.items.sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
-    } else {
-      state.sortKey = 'rating';
-      state.sortDir = 'desc';
-    }
+    state.scoreFilter = score;
+    state.renderLimit = 36;
     renderAll();
     showToast(score === 0 ? 'Viewing unrated titles in Library' : `Viewing ${score}★ rated titles in Library`);
   } else if (action === 'stats-filter-studio') {
     const studio = btn.dataset.studio;
     state.view = 'library';
+    state.scoreFilter = null;
+    state.renderLimit = 36;
     state.search = studio;
     const lInp = document.getElementById('librarySearchInput');
     if (lInp) lInp.value = studio;
@@ -3392,10 +3323,32 @@ document.addEventListener('click', async (e) => {
       const yyyy = String(now.getFullYear());
       item.consumedDate = `${dd}-${mm}-${yyyy}`;
       item.updatedAt = Date.now();
-      saveItems();
+      saveItems(true, item);
       renderAll();
       showToast(`Logged "${item.title}" finished today (${item.consumedDate}) 📅`);
     }
+  } else if (action === 'toggle-card-synopsis') {
+    e.stopPropagation();
+    const id = btn.dataset.id;
+    if (!id) return;
+    if (state.expandedSynopses.has(id)) state.expandedSynopses.delete(id);
+    else state.expandedSynopses.add(id);
+    renderLibrary();
+  } else if (action === 'edit-item-focus-review') {
+    e.stopPropagation();
+    const item = state.items.find((i) => i.id === btn.dataset.id);
+    if (item) {
+      openMediaModal(item);
+      const acc = document.getElementById('modalMoreDetailsAccordion');
+      if (acc) acc.open = true;
+      setTimeout(() => document.getElementById('fieldNotes')?.focus(), 60);
+    }
+  } else if (action === 'load-more-items') {
+    state.renderLimit = (state.renderLimit || 36) + 36;
+    renderLibrary();
+  } else if (action === 'load-all-items') {
+    state.renderLimit = Math.max(36, state.items.length);
+    renderLibrary();
   } else if (action === 'edit-item') {
     e.stopPropagation();
     const item = state.items.find((i) => i.id === btn.dataset.id);
@@ -3451,7 +3404,7 @@ document.addEventListener('click', async (e) => {
     item.progress = Math.min(total, Math.max(0, Number(item.progress || 0) + delta));
     if (item.progress === total) item.status = 'Completed';
     item.updatedAt = Date.now();
-    saveItems();
+    saveItems(true, item);
     renderAll();
   } else if (action === 'switch-card-tab') {
     e.stopPropagation();
@@ -3506,19 +3459,13 @@ document.addEventListener('click', async (e) => {
     if (dRaw)   dRaw.value   = '';
     if (rTog)   rTog.checked = false;
     if (endRow) endRow.classList.add('hidden');
-  } else if (action === 'append-date-to') {
-    const inp = document.getElementById('fieldConsumedDate');
-    if (inp) {
-      if (inp.value && !inp.value.includes('to')) inp.value = inp.value.trim() + ' to ';
-      inp.focus();
-    }
   } else if (action === 'pick-search-result') {
     const r = (window._lastSearchResults || [])[parseInt(btn.dataset.idx, 10)];
     if (r) {
       state.currentModalTitleEnglish = r.titleEnglish || '';
       state.currentModalTitleRomaji  = r.titleRomaji || '';
 
-      if ((!state.currentModalTitleEnglish || !state.currentModalTitleRomaji) && typeof lookupBilingualTitle === 'function') {
+      if (!state.currentModalTitleEnglish || !state.currentModalTitleRomaji) {
         const match = lookupBilingualTitle(r.title) || lookupBilingualTitle(r.titleEnglish) || lookupBilingualTitle(r.titleRomaji);
         if (match) {
           if (!state.currentModalTitleEnglish && match.english) state.currentModalTitleEnglish = match.english;
@@ -3618,10 +3565,14 @@ document.addEventListener('click', async (e) => {
       title: `Delete ${count} Selected Entries?`,
       message: `This will remove the ${count} selected entries from your library.`,
       onConfirm: () => {
+        const deletedIds = Array.from(state.selectedIds);
         state.undoBuffer = { previousItems: JSON.parse(JSON.stringify(state.items)) };
         state.items = state.items.filter((i) => !state.selectedIds.has(i.id));
         state.selectedIds.clear();
         saveItems();
+        if (typeof CloudSync !== 'undefined' && CloudSync.deleteItems) {
+          CloudSync.deleteItems(deletedIds);
+        }
         renderAll();
         showToast(`Removed ${count} entries`, { undoAction: true, duration: 6000 });
       }
@@ -3635,11 +3586,15 @@ document.addEventListener('click', async (e) => {
       message: `This will remove all ${visible.length} entries currently matching your active filter.`,
       requirePhrase: 'DELETE',
       onConfirm: () => {
+        const deletedIds = visible.map((i) => i.id);
+        const removeSet = new Set(deletedIds);
         state.undoBuffer = { previousItems: JSON.parse(JSON.stringify(state.items)) };
-        const removeSet = new Set(visible.map((i) => i.id));
         state.items = state.items.filter((i) => !removeSet.has(i.id));
         state.selectedIds.clear();
         saveItems();
+        if (typeof CloudSync !== 'undefined' && CloudSync.deleteItems) {
+          CloudSync.deleteItems(deletedIds);
+        }
         renderAll();
         showToast(`Removed ${visible.length} entries`, { undoAction: true, duration: 6000 });
       }
@@ -3767,8 +3722,6 @@ document.addEventListener('click', async (e) => {
     openAuthModal();
   } else if (action === 'close-auth-modal') {
     document.getElementById('authModal').classList.add('hidden');
-  } else if (action === 'switch-auth-tab') {
-    switchAuthTab(btn.dataset.tab);
   } else if (action === 'auth-sign-in') {
     const email = document.getElementById('authEmailInput')?.value?.trim();
     const pwd   = document.getElementById('authPasswordInput')?.value?.trim();
@@ -3803,20 +3756,14 @@ document.addEventListener('click', async (e) => {
             <div class="font-bold text-white flex items-center gap-1.5">
               <span>✉️</span> Email Confirmation Required
             </div>
-            <p class="leading-relaxed">Supabase requires clicking the confirmation link sent to <strong>${esc(email)}</strong> before signing in.</p>
-            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
-              <span class="text-[#ff9f1c] font-semibold">⚡ Instant Access (No Email Wait):</span> In your Supabase Dashboard, go to <strong>Authentication → Providers → Email</strong> and turn OFF <strong>"Confirm email"</strong>. Then you can log in immediately!
-            </div>
+            <p class="leading-relaxed">Please check your inbox to confirm your email before signing in (<strong>${esc(email)}</strong>).</p>
           `;
         } else if (code === 'over_email_send_rate_limit' || msg.toLowerCase().includes('rate limit')) {
           errEl.innerHTML = `
             <div class="font-bold text-rose-300 flex items-center gap-1.5">
               <span>⏳</span> Email Rate Limit Reached
             </div>
-            <p class="leading-relaxed">Supabase free tier limits confirmation emails to 3-4 per hour.</p>
-            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
-              <span class="text-[#ff9f1c] font-semibold">👉 10-Second Fix:</span> In your Supabase Dashboard under <strong>Authentication → Providers → Email</strong>, turn OFF <strong>"Confirm email"</strong>. You will be able to log in instantly without waiting for emails!
-            </div>
+            <p class="leading-relaxed">Too many email requests sent. Please wait a few minutes before trying again.</p>
           `;
         } else if (msg.toLowerCase().includes('invalid login credentials')) {
           errEl.innerHTML = `⚠️ Invalid email or password. If you haven't created an account yet, click <strong>Create Account</strong>.`;
@@ -3867,10 +3814,7 @@ document.addEventListener('click', async (e) => {
             <div class="font-bold text-white flex items-center gap-1.5">
               <span>✉️</span> Verification Link Sent!
             </div>
-            <p>Account created for <strong>${esc(email)}</strong>. Please check your inbox (and spam) to confirm your account.</p>
-            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
-              <span class="text-[#ff9f1c] font-semibold">⚡ Skip Verification:</span> Turn off <strong>"Confirm email"</strong> in your Supabase Dashboard (<strong>Authentication → Providers → Email</strong>) for instant 1-click accounts on all devices.
-            </div>
+            <p>Account created for <strong>${esc(email)}</strong>. Please check your email to verify your account.</p>
           `;
           errEl.classList.remove('hidden');
         }
@@ -3886,10 +3830,7 @@ document.addEventListener('click', async (e) => {
             <div class="font-bold text-rose-300 flex items-center gap-1.5">
               <span>⏳</span> Email Rate Limit Reached
             </div>
-            <p class="leading-relaxed">Supabase's built-in email service limits verification emails on the free tier.</p>
-            <div class="mt-2 p-2 rounded bg-black/40 border border-[#3d494f] text-[11px] text-slate-300">
-              <span class="text-[#ff9f1c] font-semibold">👉 10-Second Fix:</span> In your Supabase Dashboard under <strong>Authentication → Providers → Email</strong>, turn OFF <strong>"Confirm email"</strong>. Then you can create accounts and sign in instantly without any email limit!
-            </div>
+            <p class="leading-relaxed">Too many email requests sent. Please wait a few minutes before trying again.</p>
           `;
         } else {
           errEl.textContent = msg || 'Failed to create account';
@@ -4035,20 +3976,6 @@ document.addEventListener('click', async (e) => {
     } else {
       showToast('No entries found in cloud database');
     }
-  } else if (action === 'auth-save-config') {
-    const url = document.getElementById('cfgSupabaseUrl')?.value;
-    const key = document.getElementById('cfgSupabaseAnonKey')?.value;
-    CloudSync.saveCredentials(url, key);
-    const notice = document.getElementById('cfgSaveNotice');
-    if (notice) {
-      notice.classList.remove('hidden');
-      setTimeout(() => notice.classList.add('hidden'), 3000);
-    }
-    renderAuthStatus();
-    showToast('Supabase credentials saved!');
-  } else if (action === 'copy-sql-schema') {
-    navigator.clipboard.writeText(CloudSync.getSqlSchema());
-    showToast('SQL schema copied to clipboard!');
   }
 });
 
@@ -4069,7 +3996,8 @@ if (libSearch) {
 const sortSel = document.getElementById('sortSelect');
 if (sortSel) {
   sortSel.addEventListener('change', (e) => {
-    state.sort = e.target.value;
+    state.sortKey = e.target.value;
+    try { localStorage.setItem('omnichart_sort_key', state.sortKey); } catch (err) {}
     renderLibrary();
   });
 }
@@ -4257,7 +4185,7 @@ if (modalCatSelect) {
 const modalStatusSelect = document.getElementById('fieldStatus');
 if (modalStatusSelect) {
   modalStatusSelect.addEventListener('change', (e) => {
-    const val = (typeof normalizeStatus === 'function') ? normalizeStatus(e.target.value) : e.target.value;
+    const val = normalizeStatus(e.target.value);
     const progInp = document.getElementById('fieldProgress');
     const totInp  = document.getElementById('fieldTotalUnits');
     if (val === 'Completed' && progInp && totInp) {
@@ -4276,7 +4204,7 @@ if (modalTitleInput) {
     const curId = document.getElementById('fieldId')?.value || '';
     checkDuplicateTitle(val, curId);
 
-    if (val && typeof lookupBilingualTitle === 'function') {
+    if (val) {
       const match = lookupBilingualTitle(val);
       if (match) {
         const fieldEng = document.getElementById('fieldTitleEnglish');
@@ -4467,7 +4395,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '/') {
     e.preventDefault();
     if (state.view === 'genre') {
-      const gInp = document.getElementById('genreSearchInput');
+      const gInp = document.getElementById('genreViewSearchInput');
       if (gInp) { gInp.focus(); gInp.select(); }
     } else {
       const lInp = document.getElementById('librarySearchInput');

@@ -22,7 +22,7 @@
 - **📊 Clean Media Lifecycle Tabs**: Track entries across **Ongoing**, **Completed**, **On Hold**, **Planning**, and **Dropped** with real-time counters and filter tabs.
 - **🗑️ Mass Removal & Clean-Up**: Built-in bulk operations with dedicated filters to find placeholder titles (`TV (JP)Released`), unrated entries, or wipe/restore cleanly.
 - **🔐 Owner Mode vs. Public Read-Only**: Designed for GitHub portfolio showcases — allows public visitors to browse, search, and view your catalog while requiring an Owner Passcode (`?owner=...`) to edit or delete entries.
-- **☁️ Plug-and-Play Cloud Sync**: Pre-configured stubs and data adapters for **Supabase** (Postgres + Realtime) and **Firebase Firestore**.
+- **☁️ Plug-and-Play Cloud Sync**: Production-ready multi-user sync engine and auth powered by **Supabase** (Postgres + Realtime).
 
 ---
 
@@ -143,6 +143,8 @@ OmniChart includes a full multi-user authentication and database synchronization
        id TEXT NOT NULL,
        user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
        title TEXT NOT NULL,
+       title_english TEXT DEFAULT '',
+       title_romaji TEXT DEFAULT '',
        category TEXT DEFAULT 'Series & Anime',
        status TEXT DEFAULT 'Completed',
        rating NUMERIC DEFAULT 0,
@@ -153,6 +155,8 @@ OmniChart includes a full multi-user authentication and database synchronization
        release_date TEXT DEFAULT 'TBA',
        consumed_date TEXT DEFAULT '',
        genres TEXT[] DEFAULT '{}',
+       favorite BOOLEAN DEFAULT false,
+       tags TEXT[] DEFAULT '{}',
        image TEXT DEFAULT '',
        synopsis TEXT DEFAULT '',
        notes TEXT DEFAULT '',
@@ -194,26 +198,6 @@ OmniChart includes a full multi-user authentication and database synchronization
        url: 'https://YOUR_PROJECT.supabase.co',
        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
        tableName: 'omnichart_items'
-     }
-   };
-   ```
-   *(Alternatively, credentials can be set directly in the browser via **☁️ Sync → Database Setup**).*
-
-### 🔥 Option B: Firebase Firestore
-
-1. **Add Firebase SDK** to `index.html`:
-   ```html
-   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-   ```
-
-2. **Set configuration** in [`js/sync.js`](file:///c:/Projects/OmniChart/js/sync.js):
-   ```javascript
-   const OMNICHART_CONFIG = {
-     cloudProvider: 'firebase',
-     firebase: {
-       apiKey: "AIzaSy...",
-       projectId: "your-project-id"
      }
    };
    ```

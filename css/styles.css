@@ -40,6 +40,7 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
+.animate-fade-in,
 .animate-fadeIn {
   animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -61,20 +62,5 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-}
-
-/* ---------- Mobile Touch & Safe Areas (M1, M3, M5) ---------- */
-.touch-scroll {
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-}
-
-@supports (padding: max(0px)) {
-  .pb-safe {
-    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
-  }
-  .bottom-nav-safe {
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 }
