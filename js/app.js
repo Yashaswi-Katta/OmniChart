@@ -25,9 +25,11 @@ const POPULAR_GENRES_BY_CATEGORY = {
     'Thriller', 'Western', 'Cyberpunk', 'Dystopian', 'Dark Fantasy'
   ],
   games: [
-    'Action', 'Adventure', 'RPG', 'Strategy', 'Open World', 'Survival', 'Sandbox',
-    'Shooter', 'Indie', 'Roguelike', 'Visual Novel', 'Simulation', 'Horror',
-    'Platformer', 'Fighting', 'Sports'
+    'Action', 'Adventure', 'Action RPG', 'RPG', 'Soulslike', 'Metroidvania',
+    'First-person shooter', 'Shooter', 'Open World', 'Hack and slash', 'Strategy',
+    'Tactical', 'Survival', 'Horror', 'Platformer', 'Roguelike', 'Puzzle',
+    'Simulation', 'Fighting', 'Sports', 'Racing', 'Visual Novel', 'Indie',
+    'Dark Fantasy', 'Sci-Fi', 'Sandbox'
   ],
   books: [
     'Fantasy', 'High Fantasy', 'Urban Fantasy', 'Sci-Fi', 'LitRPG', 'Dystopian',
@@ -2233,6 +2235,8 @@ function updateCategoryAwareFormFields() {
   if (labelStat) labelStat.textContent = meta.stat;
   if (cat === 'Movies' && totalUnits && (!totalUnits.value || totalUnits.value === '12')) {
     totalUnits.value = '1';
+  } else if (cat === 'Games' && totalUnits && (!totalUnits.value || totalUnits.value === '1' || totalUnits.value === '12')) {
+    totalUnits.value = '15';
   }
 
   if (statusSel) {
@@ -2441,7 +2445,7 @@ function openMediaModal(item = null, presetDate = '') {
     document.getElementById('fieldStatus').value           = 'Ongoing';
     document.getElementById('fieldRating').value           = 0;
     document.getElementById('fieldProgress').value         = 0;
-    document.getElementById('fieldTotalUnits').value       = (catVal === 'Movies' ? 1 : 12);
+    document.getElementById('fieldTotalUnits').value       = (catVal === 'Movies' ? 1 : catVal === 'Games' ? 15 : 12);
     document.getElementById('fieldStudio').value           = '';
     document.getElementById('fieldReleaseDate').value      = '';
     document.getElementById('fieldImage').value            = '';
@@ -3591,7 +3595,7 @@ document.addEventListener('click', async (e) => {
         catField.value = r.category || 'Series & Anime';
         catField.dispatchEvent(new Event('change'));
       }
-      const totalVal = r.totalUnits || (r.category === 'Movies' ? 1 : 12);
+      const totalVal = r.totalUnits || (r.category === 'Movies' ? 1 : r.category === 'Games' ? 15 : 12);
       document.getElementById('fieldTotalUnits').value  = totalVal;
       document.getElementById('fieldProgress').value    = document.getElementById('fieldStatus').value === 'Completed' ? totalVal : 0;
       document.getElementById('fieldStudio').value      = r.studio || '';

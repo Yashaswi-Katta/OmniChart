@@ -28,9 +28,437 @@ const KNOWN_GAME_GENRES = [
   'Action-adventure', 'Action RPG', 'Role-playing', 'First-person shooter',
   'Third-person shooter', 'Platformer', 'Metroidvania', 'Roguelike',
   'Survival horror', 'Strategy', 'Simulation', 'Fighting', 'Sports',
-  'Racing', 'Puzzle', 'Hack and slash', 'Stealth', 'Open world',
-  'Sandbox', 'Visual novel', 'Battle royale', 'Tactical shooter', 'Soulslike'
+  'Racing', 'Puzzle', 'Hack and slash', 'Stealth', 'Open World',
+  'Sandbox', 'Visual Novel', 'Battle Royale', 'Tactical', 'Soulslike',
+  'Dungeon Crawler', 'Dark Fantasy', 'Sci-Fi', 'Indie'
 ];
+
+/** Regex rule set for matching video game genres from Wikipedia extracts & category tags */
+const GAME_GENRE_RULES = [
+  { name: 'Soulslike', regex: /\b(?:soulslike|souls-like)\b/i },
+  { name: 'Action RPG', regex: /\b(?:action role-playing|action rpg|arpg)\b/i },
+  { name: 'Role-playing', regex: /\b(?:role-playing|rpg|jrpg|crpg|turn-based role-playing)\b/i },
+  { name: 'Metroidvania', regex: /\bmetroidvania\b/i },
+  { name: 'Roguelike', regex: /\b(?:roguelike|roguelite|rogue-like)\b/i },
+  { name: 'First-person shooter', regex: /\b(?:first-person shooter|first-person shooters|fps)\b/i },
+  { name: 'Third-person shooter', regex: /\bthird-person shooter(?:s)?\b/i },
+  { name: 'Platformer', regex: /\b(?:platformer|platformers|platform game|platform video game)\b/i },
+  { name: 'Open World', regex: /\b(?:open-world|open world)\b/i },
+  { name: 'Survival horror', regex: /\bsurvival horror\b/i },
+  { name: 'Hack and slash', regex: /\bhack and slash\b/i },
+  { name: 'Tactical', regex: /\b(?:tactical shooter|tactical role-playing|tactical rpg|strategy video game|turn-based strategy|real-time strategy)\b/i },
+  { name: 'Fighting', regex: /\bfighting (?:game|video game)s?\b/i },
+  { name: 'Stealth', regex: /\bstealth (?:game|video game)s?\b/i },
+  { name: 'Puzzle', regex: /\bpuzzle (?:game|video game)s?\b/i },
+  { name: 'Racing', regex: /\bracing (?:game|video game)s?\b/i },
+  { name: 'Sports', regex: /\bsports (?:game|video game)s?\b/i },
+  { name: 'Simulation', regex: /\b(?:simulation video game|life simulator|simulator)\b/i },
+  { name: 'Visual Novel', regex: /\bvisual novel\b/i },
+  { name: 'Battle Royale', regex: /\bbattle royale\b/i },
+  { name: 'Dungeon Crawler', regex: /\bdungeon crawler\b/i },
+  { name: 'Dark Fantasy', regex: /\bdark fantasy\b/i },
+  { name: 'Sci-Fi', regex: /\b(?:science fiction|sci-fi|cyberpunk)\b/i },
+  { name: 'Indie', regex: /\bindie (?:game|video game|studio)s?\b/i },
+  { name: 'Sandbox', regex: /\bsandbox\b/i },
+  { name: 'Action-adventure', regex: /\baction-adventure\b/i }
+];
+
+/**
+ * Curated benchmark lookup table for popular video games.
+ * Maps normalized game title keys to accurate HowLongToBeat main story hours and primary genres.
+ */
+const POPULAR_GAME_BENCHMARKS = {
+  // FromSoftware / Souls
+  'elden ring': { hours: 60, genres: ['Action RPG', 'Open World', 'Soulslike', 'Dark Fantasy'] },
+  'elden ring shadow of the erdtree': { hours: 25, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'dark souls': { hours: 41, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'dark souls remastered': { hours: 41, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'dark souls 2': { hours: 44, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'dark souls ii': { hours: 44, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'dark souls 3': { hours: 32, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'dark souls iii': { hours: 32, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'bloodborne': { hours: 33, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy', 'Survival horror'] },
+  'sekiro': { hours: 30, genres: ['Action-adventure', 'Soulslike', 'Stealth'] },
+  'sekiro shadows die twice': { hours: 30, genres: ['Action-adventure', 'Soulslike', 'Stealth'] },
+  'demons souls': { hours: 30, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'armored core 6': { hours: 15, genres: ['Action', 'Sci-Fi', 'Simulation'] },
+  'armored core vi': { hours: 15, genres: ['Action', 'Sci-Fi', 'Simulation'] },
+  'armored core vi fires of rubicon': { hours: 15, genres: ['Action', 'Sci-Fi', 'Simulation'] },
+  'lies of p': { hours: 30, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+  'black myth wukong': { hours: 35, genres: ['Action RPG', 'Soulslike', 'Dark Fantasy'] },
+
+  // CD Projekt Red
+  'witcher 3': { hours: 52, genres: ['Action RPG', 'Open World', 'Dark Fantasy'] },
+  'witcher 3 wild hunt': { hours: 52, genres: ['Action RPG', 'Open World', 'Dark Fantasy'] },
+  'witcher 2': { hours: 24, genres: ['Action RPG', 'Dark Fantasy', 'Role-playing'] },
+  'witcher 2 assassins of kings': { hours: 24, genres: ['Action RPG', 'Dark Fantasy', 'Role-playing'] },
+  'witcher': { hours: 35, genres: ['Action RPG', 'Dark Fantasy', 'Role-playing'] },
+  'cyberpunk 2077': { hours: 26, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+  'cyberpunk 2077 phantom liberty': { hours: 13, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+
+  // Bethesda / Obsidian
+  'skyrim': { hours: 34, genres: ['Action RPG', 'Open World', 'Role-playing'] },
+  'elder scrolls v skyrim': { hours: 34, genres: ['Action RPG', 'Open World', 'Role-playing'] },
+  'elder scrolls iv oblivion': { hours: 30, genres: ['Action RPG', 'Open World', 'Role-playing'] },
+  'fallout 3': { hours: 23, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+  'fallout new vegas': { hours: 27, genres: ['Action RPG', 'Open World', 'Role-playing'] },
+  'fallout 4': { hours: 27, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+  'starfield': { hours: 23, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+  'dishonored': { hours: 12, genres: ['Stealth', 'Action-adventure', 'Dark Fantasy'] },
+  'dishonored 2': { hours: 12, genres: ['Stealth', 'Action-adventure', 'Dark Fantasy'] },
+  'prey': { hours: 16, genres: ['Sci-Fi', 'Survival horror', 'First-person shooter'] },
+  'deathloop': { hours: 16, genres: ['First-person shooter', 'Action-adventure', 'Sci-Fi'] },
+  'doom': { hours: 11, genres: ['First-person shooter', 'Action', 'Sci-Fi'] },
+  'doom 2016': { hours: 11, genres: ['First-person shooter', 'Action', 'Sci-Fi'] },
+  'doom eternal': { hours: 14, genres: ['First-person shooter', 'Action', 'Sci-Fi'] },
+
+  // BioWare
+  'baldurs gate 3': { hours: 75, genres: ['Role-playing', 'Tactical', 'Dark Fantasy'] },
+  'baldurs gate 2': { hours: 45, genres: ['Role-playing', 'Tactical', 'Dark Fantasy'] },
+  'baldurs gate': { hours: 30, genres: ['Role-playing', 'Tactical', 'Dark Fantasy'] },
+  'mass effect': { hours: 17, genres: ['Action RPG', 'Sci-Fi', 'Third-person shooter'] },
+  'mass effect 2': { hours: 24, genres: ['Action RPG', 'Sci-Fi', 'Third-person shooter'] },
+  'mass effect 3': { hours: 24, genres: ['Action RPG', 'Sci-Fi', 'Third-person shooter'] },
+  'mass effect legendary edition': { hours: 60, genres: ['Action RPG', 'Sci-Fi', 'Third-person shooter'] },
+  'dragon age origins': { hours: 41, genres: ['Role-playing', 'Dark Fantasy', 'Tactical'] },
+  'dragon age 2': { hours: 27, genres: ['Action RPG', 'Dark Fantasy', 'Role-playing'] },
+  'dragon age inquisition': { hours: 46, genres: ['Action RPG', 'Open World', 'Dark Fantasy'] },
+  'dragon age the veilguard': { hours: 40, genres: ['Action RPG', 'Dark Fantasy'] },
+
+  // Rockstar
+  'red dead redemption 2': { hours: 50, genres: ['Action-adventure', 'Open World'] },
+  'red dead redemption': { hours: 18, genres: ['Action-adventure', 'Open World'] },
+  'grand theft auto v': { hours: 32, genres: ['Action-adventure', 'Open World'] },
+  'gta 5': { hours: 32, genres: ['Action-adventure', 'Open World'] },
+  'grand theft auto iv': { hours: 28, genres: ['Action-adventure', 'Open World'] },
+  'gta 4': { hours: 28, genres: ['Action-adventure', 'Open World'] },
+  'grand theft auto san andreas': { hours: 31, genres: ['Action-adventure', 'Open World'] },
+  'grand theft auto vice city': { hours: 18, genres: ['Action-adventure', 'Open World'] },
+  'grand theft auto iii': { hours: 15, genres: ['Action-adventure', 'Open World'] },
+
+  // Sony PlayStation
+  'god of war': { hours: 21, genres: ['Action-adventure', 'Hack and slash', 'Dark Fantasy'] },
+  'god of war 2018': { hours: 21, genres: ['Action-adventure', 'Hack and slash', 'Dark Fantasy'] },
+  'god of war ragnarok': { hours: 26, genres: ['Action-adventure', 'Hack and slash', 'Dark Fantasy'] },
+  'last of us': { hours: 15, genres: ['Action-adventure', 'Survival horror', 'Stealth'] },
+  'last of us part i': { hours: 15, genres: ['Action-adventure', 'Survival horror', 'Stealth'] },
+  'last of us part 1': { hours: 15, genres: ['Action-adventure', 'Survival horror', 'Stealth'] },
+  'last of us part ii': { hours: 24, genres: ['Action-adventure', 'Survival horror', 'Stealth'] },
+  'last of us part 2': { hours: 24, genres: ['Action-adventure', 'Survival horror', 'Stealth'] },
+  'ghost of tsushima': { hours: 25, genres: ['Action-adventure', 'Open World', 'Stealth'] },
+  'spiderman': { hours: 17, genres: ['Action-adventure', 'Open World'] },
+  'marvels spiderman': { hours: 17, genres: ['Action-adventure', 'Open World'] },
+  'spiderman remastered': { hours: 17, genres: ['Action-adventure', 'Open World'] },
+  'spiderman miles morales': { hours: 8, genres: ['Action-adventure', 'Open World'] },
+  'spiderman 2': { hours: 17, genres: ['Action-adventure', 'Open World'] },
+  'marvels spiderman 2': { hours: 17, genres: ['Action-adventure', 'Open World'] },
+  'horizon zero dawn': { hours: 30, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+  'horizon forbidden west': { hours: 28, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+  'uncharted drakes fortune': { hours: 8, genres: ['Action-adventure', 'Third-person shooter'] },
+  'uncharted 2 among thieves': { hours: 10, genres: ['Action-adventure', 'Third-person shooter'] },
+  'uncharted 3 drakes deception': { hours: 9, genres: ['Action-adventure', 'Third-person shooter'] },
+  'uncharted 4 a thiefs end': { hours: 15, genres: ['Action-adventure', 'Third-person shooter'] },
+  'death stranding': { hours: 40, genres: ['Action-adventure', 'Open World', 'Sci-Fi'] },
+  'infamous second son': { hours: 10, genres: ['Action-adventure', 'Open World'] },
+  'shadow of the colossus': { hours: 8, genres: ['Action-adventure', 'Puzzle'] },
+  'returnal': { hours: 19, genres: ['Roguelike', 'Third-person shooter', 'Sci-Fi'] },
+
+  // Nintendo
+  'legend of zelda breath of the wild': { hours: 50, genres: ['Action-adventure', 'Open World', 'Puzzle'] },
+  'breath of the wild': { hours: 50, genres: ['Action-adventure', 'Open World', 'Puzzle'] },
+  'legend of zelda tears of the kingdom': { hours: 59, genres: ['Action-adventure', 'Open World', 'Puzzle'] },
+  'tears of the kingdom': { hours: 59, genres: ['Action-adventure', 'Open World', 'Puzzle'] },
+  'legend of zelda ocarina of time': { hours: 17, genres: ['Action-adventure', 'Puzzle'] },
+  'ocarina of time': { hours: 17, genres: ['Action-adventure', 'Puzzle'] },
+  'legend of zelda majoras mask': { hours: 20, genres: ['Action-adventure', 'Puzzle'] },
+  'legend of zelda twilight princess': { hours: 35, genres: ['Action-adventure', 'Puzzle'] },
+  'legend of zelda wind waker': { hours: 29, genres: ['Action-adventure', 'Open World'] },
+  'super mario odyssey': { hours: 13, genres: ['Platformer', 'Action-adventure'] },
+  'super mario galaxy': { hours: 13, genres: ['Platformer'] },
+  'super mario 64': { hours: 12, genres: ['Platformer'] },
+  'super mario sunshine': { hours: 14, genres: ['Platformer'] },
+  'super mario bros wonder': { hours: 10, genres: ['Platformer'] },
+  'super mario wonder': { hours: 10, genres: ['Platformer'] },
+  'metroid dread': { hours: 9, genres: ['Metroidvania', 'Platformer', 'Sci-Fi'] },
+  'metroid prime': { hours: 13, genres: ['First-person shooter', 'Metroidvania', 'Sci-Fi'] },
+  'metroid prime remastered': { hours: 13, genres: ['First-person shooter', 'Metroidvania', 'Sci-Fi'] },
+  'xenoblade chronicles definitive edition': { hours: 68, genres: ['Role-playing', 'Open World', 'Sci-Fi'] },
+  'xenoblade chronicles 2': { hours: 65, genres: ['Role-playing', 'Open World', 'Sci-Fi'] },
+  'xenoblade chronicles 3': { hours: 61, genres: ['Role-playing', 'Open World', 'Sci-Fi'] },
+  'fire emblem three houses': { hours: 48, genres: ['Tactical', 'Role-playing'] },
+  'fire emblem engage': { hours: 38, genres: ['Tactical', 'Role-playing'] },
+  'pokemon red': { hours: 26, genres: ['Role-playing', 'Adventure'] },
+  'pokemon blue': { hours: 26, genres: ['Role-playing', 'Adventure'] },
+  'pokemon emerald': { hours: 31, genres: ['Role-playing', 'Adventure'] },
+  'pokemon platinum': { hours: 43, genres: ['Role-playing', 'Adventure'] },
+  'pokemon heartgold': { hours: 37, genres: ['Role-playing', 'Adventure'] },
+  'pokemon black': { hours: 32, genres: ['Role-playing', 'Adventure'] },
+  'pokemon sword': { hours: 14, genres: ['Role-playing', 'Adventure'] },
+  'pokemon scarlet': { hours: 26, genres: ['Role-playing', 'Open World'] },
+  'pokemon legends arceus': { hours: 25, genres: ['Action RPG', 'Open World'] },
+
+  // Square Enix & JRPGs
+  'final fantasy vii': { hours: 37, genres: ['Role-playing', 'Sci-Fi'] },
+  'final fantasy vii remake': { hours: 33, genres: ['Action RPG', 'Sci-Fi'] },
+  'final fantasy vii rebirth': { hours: 45, genres: ['Action RPG', 'Open World', 'Sci-Fi'] },
+  'final fantasy viii': { hours: 40, genres: ['Role-playing', 'Sci-Fi'] },
+  'final fantasy ix': { hours: 39, genres: ['Role-playing', 'Fantasy'] },
+  'final fantasy x': { hours: 46, genres: ['Role-playing', 'Fantasy'] },
+  'final fantasy xii': { hours: 61, genres: ['Role-playing', 'Fantasy'] },
+  'final fantasy xiv': { hours: 120, genres: ['Role-playing', 'Open World'] },
+  'final fantasy xv': { hours: 28, genres: ['Action RPG', 'Open World'] },
+  'final fantasy xvi': { hours: 36, genres: ['Action RPG', 'Dark Fantasy'] },
+  'nier automata': { hours: 21, genres: ['Action RPG', 'Hack and slash', 'Sci-Fi'] },
+  'nier replicant': { hours: 20, genres: ['Action RPG', 'Hack and slash', 'Dark Fantasy'] },
+  'chrono trigger': { hours: 23, genres: ['Role-playing', 'Sci-Fi'] },
+  'dragon quest xi': { hours: 57, genres: ['Role-playing', 'Fantasy'] },
+  'dragon quest xi s': { hours: 57, genres: ['Role-playing', 'Fantasy'] },
+  'kingdom hearts': { hours: 28, genres: ['Action RPG', 'Action-adventure'] },
+  'kingdom hearts ii': { hours: 32, genres: ['Action RPG', 'Action-adventure'] },
+  'kingdom hearts 2': { hours: 32, genres: ['Action RPG', 'Action-adventure'] },
+  'kingdom hearts iii': { hours: 29, genres: ['Action RPG', 'Action-adventure'] },
+  'kingdom hearts 3': { hours: 29, genres: ['Action RPG', 'Action-adventure'] },
+  'octopath traveler': { hours: 60, genres: ['Role-playing', 'Turn-based RPG'] },
+  'octopath traveler ii': { hours: 60, genres: ['Role-playing', 'Turn-based RPG'] },
+  'octopath traveler 2': { hours: 60, genres: ['Role-playing', 'Turn-based RPG'] },
+
+  // Atlus / Sega
+  'persona 3 reload': { hours: 65, genres: ['Role-playing', 'Simulation'] },
+  'persona 3 portable': { hours: 65, genres: ['Role-playing', 'Simulation'] },
+  'persona 3': { hours: 65, genres: ['Role-playing', 'Simulation'] },
+  'persona 4 golden': { hours: 68, genres: ['Role-playing', 'Simulation'] },
+  'persona 4': { hours: 72, genres: ['Role-playing', 'Simulation'] },
+  'persona 5': { hours: 97, genres: ['Role-playing', 'Simulation'] },
+  'persona 5 royal': { hours: 101, genres: ['Role-playing', 'Simulation'] },
+  'metaphor refantazio': { hours: 80, genres: ['Role-playing', 'Turn-based RPG', 'Fantasy'] },
+  'shin megami tensei v': { hours: 45, genres: ['Role-playing', 'Dark Fantasy'] },
+  'shin megami tensei v vengeance': { hours: 50, genres: ['Role-playing', 'Dark Fantasy'] },
+  'shin megami tensei iii nocturne': { hours: 50, genres: ['Role-playing', 'Dark Fantasy'] },
+  'yakuza 0': { hours: 31, genres: ['Action-adventure', 'Beat em up', 'Open World'] },
+  'yakuza kiwami': { hours: 17, genres: ['Action-adventure', 'Beat em up'] },
+  'yakuza kiwami 2': { hours: 18, genres: ['Action-adventure', 'Beat em up'] },
+  'yakuza like a dragon': { hours: 45, genres: ['Role-playing', 'Turn-based RPG'] },
+  'like a dragon infinite wealth': { hours: 55, genres: ['Role-playing', 'Turn-based RPG'] },
+  'like a dragon the man who erased his name': { hours: 12, genres: ['Action-adventure', 'Beat em up'] },
+  'judgment': { hours: 27, genres: ['Action-adventure', 'Detective'] },
+  'lost judgment': { hours: 23, genres: ['Action-adventure', 'Detective'] },
+
+  // Valve
+  'half life': { hours: 12, genres: ['First-person shooter', 'Sci-Fi'] },
+  'half life 2': { hours: 13, genres: ['First-person shooter', 'Sci-Fi', 'Puzzle'] },
+  'half life 2 episode one': { hours: 4, genres: ['First-person shooter', 'Sci-Fi'] },
+  'half life 2 episode two': { hours: 6, genres: ['First-person shooter', 'Sci-Fi'] },
+  'half life alyx': { hours: 12, genres: ['First-person shooter', 'VR', 'Sci-Fi'] },
+  'portal': { hours: 3, genres: ['Puzzle', 'First-person', 'Sci-Fi'] },
+  'portal 2': { hours: 8, genres: ['Puzzle', 'First-person', 'Sci-Fi'] },
+  'left 4 dead 2': { hours: 9, genres: ['First-person shooter', 'Survival horror'] },
+
+  // Capcom
+  'resident evil': { hours: 10, genres: ['Survival horror', 'Puzzle'] },
+  'resident evil 2': { hours: 8, genres: ['Survival horror', 'Third-person shooter'] },
+  'resident evil 2 remake': { hours: 8, genres: ['Survival horror', 'Third-person shooter'] },
+  'resident evil 3': { hours: 6, genres: ['Survival horror', 'Action'] },
+  'resident evil 3 remake': { hours: 6, genres: ['Survival horror', 'Action'] },
+  'resident evil 4': { hours: 15, genres: ['Survival horror', 'Third-person shooter'] },
+  'resident evil 4 remake': { hours: 16, genres: ['Survival horror', 'Third-person shooter'] },
+  'resident evil 7': { hours: 9, genres: ['Survival horror', 'First-person shooter'] },
+  'resident evil 7 biohazard': { hours: 9, genres: ['Survival horror', 'First-person shooter'] },
+  'resident evil village': { hours: 10, genres: ['Survival horror', 'First-person shooter'] },
+  'resident evil 8': { hours: 10, genres: ['Survival horror', 'First-person shooter'] },
+  'monster hunter world': { hours: 48, genres: ['Action RPG', 'Co-op'] },
+  'monster hunter world iceborne': { hours: 36, genres: ['Action RPG', 'Co-op'] },
+  'monster hunter rise': { hours: 22, genres: ['Action RPG', 'Co-op'] },
+  'monster hunter wilds': { hours: 35, genres: ['Action RPG', 'Open World'] },
+  'dragons dogma dark arisen': { hours: 33, genres: ['Action RPG', 'Dark Fantasy'] },
+  'dragons dogma 2': { hours: 26, genres: ['Action RPG', 'Open World', 'Dark Fantasy'] },
+  'devil may cry 5': { hours: 11, genres: ['Hack and slash', 'Action'] },
+
+  // Konami & Kojima
+  'metal gear solid': { hours: 11, genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 2 sons of liberty': { hours: 13, genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 3 snake eater': { hours: 16, genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 4 guns of the patriots': { hours: 18, genres: ['Stealth', 'Third-person shooter'] },
+  'metal gear solid v the phantom pain': { hours: 46, genres: ['Stealth', 'Open World', 'Third-person shooter'] },
+  'metal gear solid 5 the phantom pain': { hours: 46, genres: ['Stealth', 'Open World', 'Third-person shooter'] },
+  'silent hill 2': { hours: 9, genres: ['Survival horror', 'Psychological horror'] },
+  'silent hill 2 remake': { hours: 16, genres: ['Survival horror', 'Psychological horror'] },
+  'castlevania symphony of the night': { hours: 9, genres: ['Metroidvania', 'Platformer', 'Dark Fantasy'] },
+
+  // EA & Respawn
+  'titanfall 2': { hours: 6, genres: ['First-person shooter', 'Sci-Fi', 'Platformer'] },
+  'star wars jedi fallen order': { hours: 17, genres: ['Action-adventure', 'Soulslike', 'Sci-Fi'] },
+  'star wars jedi survivor': { hours: 20, genres: ['Action-adventure', 'Soulslike', 'Sci-Fi'] },
+  'dead space': { hours: 11, genres: ['Survival horror', 'Third-person shooter', 'Sci-Fi'] },
+  'dead space remake': { hours: 12, genres: ['Survival horror', 'Third-person shooter', 'Sci-Fi'] },
+
+  // Microsoft / Xbox
+  'halo combat evolved': { hours: 10, genres: ['First-person shooter', 'Sci-Fi'] },
+  'halo 2': { hours: 9, genres: ['First-person shooter', 'Sci-Fi'] },
+  'halo 3': { hours: 8, genres: ['First-person shooter', 'Sci-Fi'] },
+  'halo 3 odst': { hours: 6, genres: ['First-person shooter', 'Sci-Fi'] },
+  'halo reach': { hours: 8, genres: ['First-person shooter', 'Sci-Fi'] },
+  'halo 4': { hours: 8, genres: ['First-person shooter', 'Sci-Fi'] },
+  'halo infinite': { hours: 11, genres: ['First-person shooter', 'Open World', 'Sci-Fi'] },
+  'gears of war': { hours: 9, genres: ['Third-person shooter', 'Action'] },
+  'gears of war 2': { hours: 9, genres: ['Third-person shooter', 'Action'] },
+  'gears of war 3': { hours: 9, genres: ['Third-person shooter', 'Action'] },
+  'gears 5': { hours: 11, genres: ['Third-person shooter', 'Action'] },
+
+  // Ubisoft
+  'assassins creed': { hours: 15, genres: ['Action-adventure', 'Stealth'] },
+  'assassins creed 2': { hours: 19, genres: ['Action-adventure', 'Open World', 'Stealth'] },
+  'assassins creed ii': { hours: 19, genres: ['Action-adventure', 'Open World', 'Stealth'] },
+  'assassins creed brotherhood': { hours: 15, genres: ['Action-adventure', 'Open World', 'Stealth'] },
+  'assassins creed iv black flag': { hours: 23, genres: ['Action-adventure', 'Open World'] },
+  'assassins creed black flag': { hours: 23, genres: ['Action-adventure', 'Open World'] },
+  'assassins creed origins': { hours: 30, genres: ['Action RPG', 'Open World'] },
+  'assassins creed odyssey': { hours: 45, genres: ['Action RPG', 'Open World'] },
+  'assassins creed valhalla': { hours: 61, genres: ['Action RPG', 'Open World'] },
+  'assassins creed mirage': { hours: 15, genres: ['Action-adventure', 'Stealth'] },
+  'far cry 3': { hours: 15, genres: ['First-person shooter', 'Open World'] },
+  'far cry 4': { hours: 17, genres: ['First-person shooter', 'Open World'] },
+  'far cry 5': { hours: 18, genres: ['First-person shooter', 'Open World'] },
+  'far cry 6': { hours: 23, genres: ['First-person shooter', 'Open World'] },
+
+  // Remedy
+  'alan wake': { hours: 11, genres: ['Survival horror', 'Action-adventure'] },
+  'alan wake 2': { hours: 18, genres: ['Survival horror', 'Psychological horror'] },
+  'control': { hours: 12, genres: ['Third-person shooter', 'Sci-Fi', 'Metroidvania'] },
+  'quantum break': { hours: 10, genres: ['Third-person shooter', 'Sci-Fi'] },
+
+  // Indie Masterpieces
+  'hollow knight': { hours: 27, genres: ['Metroidvania', 'Platformer', 'Dark Fantasy', 'Indie'] },
+  'celeste': { hours: 8, genres: ['Platformer', 'Indie'] },
+  'hades': { hours: 22, genres: ['Roguelike', 'Action RPG', 'Hack and slash', 'Indie'] },
+  'hades ii': { hours: 25, genres: ['Roguelike', 'Action RPG', 'Hack and slash', 'Indie'] },
+  'hades 2': { hours: 25, genres: ['Roguelike', 'Action RPG', 'Hack and slash', 'Indie'] },
+  'dead cells': { hours: 14, genres: ['Roguelike', 'Metroidvania', 'Platformer', 'Indie'] },
+  'slay the spire': { hours: 12, genres: ['Roguelike', 'Strategy', 'Indie'] },
+  'cuphead': { hours: 10, genres: ['Platformer', 'Indie'] },
+  'stardew valley': { hours: 53, genres: ['Simulation', 'Role-playing', 'Indie'] },
+  'subnautica': { hours: 30, genres: ['Survival horror', 'Open World', 'Sci-Fi', 'Indie'] },
+  'outer wilds': { hours: 16, genres: ['Adventure', 'Puzzle', 'Sci-Fi', 'Indie'] },
+  'disco elysium': { hours: 22, genres: ['Role-playing', 'Dark Fantasy', 'Indie'] },
+  'disco elysium the final cut': { hours: 22, genres: ['Role-playing', 'Dark Fantasy', 'Indie'] },
+  'undertale': { hours: 6, genres: ['Role-playing', 'Indie'] },
+  'deltarune': { hours: 8, genres: ['Role-playing', 'Indie'] },
+  'omori': { hours: 21, genres: ['Role-playing', 'Psychological horror', 'Indie'] },
+  'firewatch': { hours: 4, genres: ['Adventure', 'Indie'] },
+  'what remains of edith finch': { hours: 2, genres: ['Adventure', 'Indie'] },
+  'stray': { hours: 5, genres: ['Adventure', 'Sci-Fi', 'Indie'] },
+  'journey': { hours: 2, genres: ['Adventure', 'Indie'] },
+  'inside': { hours: 4, genres: ['Platformer', 'Puzzle', 'Dark Fantasy', 'Indie'] },
+  'limbo': { hours: 3, genres: ['Platformer', 'Puzzle', 'Dark Fantasy', 'Indie'] },
+  'little nightmares': { hours: 4, genres: ['Platformer', 'Survival horror', 'Dark Fantasy', 'Indie'] },
+  'little nightmares ii': { hours: 5, genres: ['Platformer', 'Survival horror', 'Dark Fantasy', 'Indie'] },
+  'little nightmares 2': { hours: 5, genres: ['Platformer', 'Survival horror', 'Dark Fantasy', 'Indie'] },
+  'ori and the blind forest': { hours: 8, genres: ['Metroidvania', 'Platformer', 'Indie'] },
+  'ori and the will of the wisps': { hours: 12, genres: ['Metroidvania', 'Platformer', 'Indie'] },
+  'sifu': { hours: 10, genres: ['Fighting', 'Action', 'Indie'] },
+  'hi fi rush': { hours: 11, genres: ['Hack and slash', 'Platformer', 'Action'] },
+  'sea of stars': { hours: 27, genres: ['Role-playing', 'Turn-based RPG', 'Indie'] },
+  'palworld': { hours: 30, genres: ['Open World', 'Survival', 'Action RPG'] },
+  'helldivers 2': { hours: 20, genres: ['Third-person shooter', 'Sci-Fi', 'Co-op'] },
+  'warhammer 40000 space marine 2': { hours: 10, genres: ['Third-person shooter', 'Hack and slash', 'Sci-Fi'] },
+  'space marine 2': { hours: 10, genres: ['Third-person shooter', 'Hack and slash', 'Sci-Fi'] },
+  'tunic': { hours: 12, genres: ['Action-adventure', 'Puzzle', 'Indie'] },
+  'dredge': { hours: 9, genres: ['Adventure', 'Survival horror', 'Indie'] },
+  'dave the diver': { hours: 25, genres: ['Simulation', 'Adventure', 'Indie'] },
+  'balatro': { hours: 15, genres: ['Roguelike', 'Strategy', 'Indie'] },
+  'vampire survivors': { hours: 13, genres: ['Roguelike', 'Action', 'Indie'] },
+  'animal crossing new horizons': { hours: 60, genres: ['Simulation', 'Sandbox'] },
+  'terraria': { hours: 50, genres: ['Sandbox', 'Survival', 'Indie'] },
+  'minecraft': { hours: 35, genres: ['Sandbox', 'Survival', 'Open World'] }
+};
+
+/** Normalize title for accurate benchmark lookup */
+function normalizeGameKey(title) {
+  if (!title) return '';
+  return String(title)
+    .toLowerCase()
+    .replace(/^(?:the|a|an)\s+/i, '')
+    .replace(/[:\-–—_]/g, ' ')
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Check benchmark table for exact or close title match */
+function lookupGameBenchmark(title) {
+  const norm = normalizeGameKey(title);
+  if (!norm) return null;
+
+  if (POPULAR_GAME_BENCHMARKS[norm]) {
+    return POPULAR_GAME_BENCHMARKS[norm];
+  }
+
+  // Substring or prefix match
+  const keys = Object.keys(POPULAR_GAME_BENCHMARKS);
+  for (const k of keys) {
+    if (norm === k || norm.startsWith(k + ' ') || k.startsWith(norm + ' ')) {
+      return POPULAR_GAME_BENCHMARKS[k];
+    }
+  }
+  return null;
+}
+
+/** Extract single-player campaign or main story duration from Wikipedia text */
+function extractGameHoursFromText(text) {
+  if (!text) return null;
+  const m = text.match(/(?:takes|lasts|requires|around|about|approximately|average of|campaign takes|playtime of)\s*(\d{1,3})(?:\s*(?:to|-)\s*(\d{1,3}))?\s*(?:hours|hrs)\b/i)
+    || text.match(/\b(\d{1,3})(?:\s*(?:to|-)\s*(\d{1,3}))?\s*(?:-| )?(?:hour|hr|hours|hrs)\s*(?:long\s*)?(?:campaign|storyline|story|single-player campaign|playtime)/i);
+  if (m) {
+    const minH = parseInt(m[1], 10);
+    const maxH = m[2] ? parseInt(m[2], 10) : minH;
+    if (minH > 0 && minH <= 250) {
+      return Math.round((minH + maxH) / 2);
+    }
+  }
+  return null;
+}
+
+/**
+ * Determine accurate main story length in hours for any game.
+ * Uses:
+ * 1. Curated benchmark table (HLTB metrics for top 180+ titles)
+ * 2. Wikipedia extract campaign duration parser
+ * 3. Smart genre-based playtime fallback heuristics
+ */
+function getGameStoryLength(title, extractText = '', genres = []) {
+  // 1. Benchmark lookup
+  const bench = lookupGameBenchmark(title);
+  if (bench && bench.hours) {
+    return bench.hours;
+  }
+
+  // 2. Wikipedia text match
+  const textHours = extractGameHoursFromText(extractText);
+  if (textHours) {
+    return textHours;
+  }
+
+  // 3. Genre-based estimate fallback
+  const genStr = Array.isArray(genres) ? genres.join(' ') : String(genres || '');
+  if (/jrpg/i.test(genStr) || (/role-playing/i.test(genStr) && /open world/i.test(genStr))) {
+    return 45;
+  }
+  if (/action rpg|role-playing|soulslike/i.test(genStr)) {
+    return 35;
+  }
+  if (/strategy|simulation|tactical|dungeon crawler/i.test(genStr)) {
+    return 25;
+  }
+  if (/metroidvania|roguelike|survival horror|action-adventure/i.test(genStr)) {
+    return 15;
+  }
+  if (/platformer|fighting|puzzle|racing|sports/i.test(genStr)) {
+    return 10;
+  }
+  if (/shooter|fps/i.test(genStr)) {
+    return 8;
+  }
+  return 12;
+}
 
 /** Generate an in-memory SVG poster fallback if remote image is missing or blocked */
 function makeFallbackPoster(title) {
@@ -81,40 +509,68 @@ function getCleanSearchTitle(rawTitle) {
   return t || rawTitle.trim();
 }
 
-/** Parse Developer, Publisher & Genres from English Wikipedia extract */
-function parseWikiGameMetadata(extract) {
-  if (!extract) return { studio: 'Unknown Developer', genres: [], releaseDate: 'TBA', synopsis: '' };
+/** Parse Developer, Publisher & Genres from English Wikipedia extract and category list */
+function parseWikiGameMetadata(extract, categories = []) {
+  if (!extract && (!categories || categories.length === 0)) {
+    return { studio: 'Unknown Developer', genres: [], releaseDate: 'TBA', synopsis: '' };
+  }
+
+  const catTitles = (categories || []).map((c) => (typeof c === 'string' ? c : c?.title || ''));
+  const allCategoryText = catTitles.join(' ');
+  const combinedHaystack = `${extract || ''} ${allCategoryText}`.toLowerCase();
 
   let studio = 'Unknown Developer';
-  const devMatch = extract.match(/developed by ([^.,;]+?)(?: and published by|, published by|\.|,|;)/i)
-    || extract.match(/by developer ([^.,;]+?)(?: and published by|, published by|\.|,|;)/i)
-    || extract.match(/published by ([^.,;]+?)(?:\.|,|;)/i);
+  const devMatch = (extract || '').match(/developed by ([^.,;]+?)(?: and published by|, published by|\.|,|;)/i)
+    || (extract || '').match(/by developer ([^.,;]+?)(?: and published by|, published by|\.|,|;)/i)
+    || (extract || '').match(/published by ([^.,;]+?)(?:\.|,|;)/i);
   if (devMatch && devMatch[1]) {
     const dev = devMatch[1].replace(/\s*\([^)]*\)/g, '').trim();
     if (dev && dev.length < 50 && !/^(the|a|an)$/i.test(dev)) studio = dev;
   }
 
+  // Fallback: check categories for developer studio (e.g., "Category:FromSoftware games")
+  if (studio === 'Unknown Developer') {
+    for (const c of catTitles) {
+      const cm = c.match(/Category:(.+?)\s+(?:games|video games)/i);
+      if (cm && cm[1]) {
+        const candidate = cm[1].trim();
+        if (candidate && !/^(?:\d{4}|action|role-playing|open-world|first-person|platform|indie|cooperative|multiplayer|single-player|cancelled|unreleased)/i.test(candidate)) {
+          studio = candidate;
+          break;
+        }
+      }
+    }
+  }
+
   const genres = [];
-  const lowExt = extract.toLowerCase();
-  for (const g of KNOWN_GAME_GENRES) {
-    const lowG = g.toLowerCase();
-    if (lowExt.includes(lowG) || (lowG === 'action rpg' && lowExt.includes('action role-playing'))) {
-      if (!genres.includes(g)) genres.push(g);
+  for (const rule of GAME_GENRE_RULES) {
+    if (rule.regex.test(combinedHaystack)) {
+      if (!genres.includes(rule.name)) {
+        genres.push(rule.name);
+      }
       if (genres.length >= 4) break;
     }
   }
 
   let releaseDate = 'TBA';
-  const yearMatch = extract.match(/\b(19[7-9]\d|20[0-3]\d)\b/);
+  const yearMatch = (extract || '').match(/\b(19[7-9]\d|20[0-3]\d)\b/);
   if (yearMatch) {
     releaseDate = yearMatch[1];
+  } else {
+    for (const c of catTitles) {
+      const ym = c.match(/\b(19[7-9]\d|20[0-3]\d)\b/);
+      if (ym) {
+        releaseDate = ym[1];
+        break;
+      }
+    }
   }
 
   return {
     studio,
     genres,
     releaseDate,
-    synopsis: extract.trim()
+    synopsis: (extract || '').trim()
   };
 }
 
@@ -122,7 +578,7 @@ function parseWikiGameMetadata(extract) {
 // Category-Specific API Search Engines
 // ---------------------------------------------------------------------------
 
-/** 1. Games: CheapShark (Steam 600x900 CDN) + Wikipedia Video Game */
+/** 1. Games: CheapShark (Steam 600x900 CDN) + Wikipedia Video Game + Story Length */
 async function searchGamesApi(cleanTitle, signal) {
   const results = [];
   try {
@@ -132,7 +588,7 @@ async function searchGamesApi(cleanTitle, signal) {
       fetch(
         `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(
           cleanTitle + ' video game'
-        )}&gsrlimit=4&prop=pageimages|extracts&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`,
+        )}&gsrlimit=4&prop=pageimages|extracts|categories&cllimit=40&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`,
         { signal }
       ).then((r) => (r.ok ? r.json() : {}))
     ]);
@@ -140,11 +596,15 @@ async function searchGamesApi(cleanTitle, signal) {
     const sharkData = sharkRes.status === 'fulfilled' && Array.isArray(sharkRes.value) ? sharkRes.value : [];
     const wikiPages = wikiRes.status === 'fulfilled' ? Object.values(wikiRes.value?.query?.pages || {}) : [];
 
-    const parsedWiki = wikiPages.map((p) => ({
-      rawTitle: (p.title || '').replace(/\s*\([^)]*game[^)]*\)/gi, '').trim(),
-      ...parseWikiGameMetadata(p.extract || ''),
-      thumbnail: p.thumbnail?.source || ''
-    }));
+    const parsedWiki = wikiPages.map((p) => {
+      const meta = parseWikiGameMetadata(p.extract || '', p.categories || []);
+      const rawTitle = (p.title || '').replace(/\s*\([^)]*game[^)]*\)/gi, '').trim();
+      return {
+        rawTitle,
+        ...meta,
+        thumbnail: p.thumbnail?.source || ''
+      };
+    });
 
     if (sharkData.length > 0) {
       for (const g of sharkData) {
@@ -158,32 +618,47 @@ async function searchGamesApi(cleanTitle, signal) {
             g.external.toLowerCase().includes(w.rawTitle.toLowerCase())
         ) || parsedWiki[0];
 
+        // Enrich genres & story length in hours
+        const benchmark = lookupGameBenchmark(g.external);
+        let finalGenres = matchedWiki?.genres || [];
+        if (finalGenres.length === 0 && benchmark?.genres) {
+          finalGenres = [...benchmark.genres];
+        }
+        const finalHours = getGameStoryLength(g.external, matchedWiki?.synopsis || '', finalGenres);
+
         results.push({
           title: g.external,
           titleEnglish: g.external,
           titleRomaji: '',
           category: 'Games',
-          totalUnits: 1,
+          totalUnits: finalHours,
           unitName: 'hrs',
           studio: matchedWiki?.studio || 'Unknown Developer',
           releaseDate: matchedWiki?.releaseDate || 'TBA',
-          genres: matchedWiki?.genres || [],
+          genres: finalGenres,
           image: steamCover || matchedWiki?.thumbnail || '',
           synopsis: matchedWiki?.synopsis || ''
         });
       }
     } else if (parsedWiki.length > 0) {
       for (const w of parsedWiki) {
+        const benchmark = lookupGameBenchmark(w.rawTitle);
+        let finalGenres = w.genres || [];
+        if (finalGenres.length === 0 && benchmark?.genres) {
+          finalGenres = [...benchmark.genres];
+        }
+        const finalHours = getGameStoryLength(w.rawTitle, w.synopsis || '', finalGenres);
+
         results.push({
           title: w.rawTitle,
           titleEnglish: w.rawTitle,
           titleRomaji: '',
           category: 'Games',
-          totalUnits: 1,
+          totalUnits: finalHours,
           unitName: 'hrs',
           studio: w.studio,
           releaseDate: w.releaseDate,
-          genres: w.genres,
+          genres: finalGenres,
           image: w.thumbnail,
           synopsis: w.synopsis
         });
@@ -678,7 +1153,7 @@ async function fetchTvMazeFallback(item) {
   }
 }
 
-/** Enrich Games via CheapShark (Steam 600x900 cover) + Wikipedia VG parser */
+/** Enrich Games via CheapShark (Steam 600x900 cover) + Wikipedia VG parser + Story Length & Genres */
 async function enrichGameItem(item, forceAll = false) {
   const cleanTitle = getCleanSearchTitle(item.title);
   let changed = false;
@@ -691,14 +1166,14 @@ async function enrichGameItem(item, forceAll = false) {
       fetch(
         `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(
           cleanTitle + ' video game'
-        )}&gsrlimit=2&prop=pageimages|extracts&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`
+        )}&gsrlimit=2&prop=pageimages|extracts|categories&cllimit=40&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`
       ).then((r) => (r.ok ? r.json() : {}))
     ]);
 
     const sharkGames = sharkRes.status === 'fulfilled' && Array.isArray(sharkRes.value) ? sharkRes.value : [];
     const wikiPages = wikiRes.status === 'fulfilled' ? Object.values(wikiRes.value?.query?.pages || {}) : [];
     const wikiData = wikiPages.length > 0 ? {
-      ...parseWikiGameMetadata(wikiPages[0].extract || ''),
+      ...parseWikiGameMetadata(wikiPages[0].extract || '', wikiPages[0].categories || []),
       thumbnail: wikiPages[0].thumbnail?.source || ''
     } : null;
 
@@ -729,7 +1204,7 @@ async function enrichGameItem(item, forceAll = false) {
           changed = true;
         }
       }
-      if (!edited.includes('genres') && (!item.genres || item.genres.length === 0 || forceAll)) {
+      if (!edited.includes('genres') && (!item.genres || item.genres.length === 0 || (item.genres.length === 1 && item.genres[0].toLowerCase() === 'uncategorized') || forceAll)) {
         if (Array.isArray(wikiData.genres) && wikiData.genres.length > 0) {
           item.genres = wikiData.genres.slice(0, 4);
           changed = true;
@@ -739,6 +1214,38 @@ async function enrichGameItem(item, forceAll = false) {
         if (wikiData.synopsis) {
           item.synopsis = wikiData.synopsis;
           changed = true;
+        }
+      }
+    }
+
+    // Benchmark fallback if genres still empty
+    const benchmark = lookupGameBenchmark(item.title);
+    if (!edited.includes('genres') && (!item.genres || item.genres.length === 0 || (item.genres.length === 1 && item.genres[0].toLowerCase() === 'uncategorized') || forceAll)) {
+      if (benchmark?.genres && benchmark.genres.length > 0) {
+        item.genres = [...benchmark.genres];
+        changed = true;
+      }
+    }
+
+    // Story length in hours & unit name
+    const currentGenres = (Array.isArray(item.genres) && item.genres.length > 0)
+      ? item.genres
+      : (wikiData?.genres || benchmark?.genres || []);
+    const storyHours = getGameStoryLength(item.title, wikiData?.synopsis || '', currentGenres);
+
+    if (!edited.includes('unitName') && item.unitName !== 'hrs') {
+      item.unitName = 'hrs';
+      changed = true;
+    }
+
+    if (!edited.includes('totalUnits') && (!item.totalUnits || item.totalUnits === 1 || item.totalUnits === 12 || forceAll)) {
+      if (storyHours && storyHours > 0) {
+        const oldTotal = item.totalUnits || 1;
+        item.totalUnits = storyHours;
+        changed = true;
+        // If completed with old default progress, synchronize progress to full hours
+        if (item.status === 'Completed' && (item.progress === oldTotal || item.progress === 1 || item.progress === 12 || item.progress === 0)) {
+          item.progress = storyHours;
         }
       }
     }
@@ -944,7 +1451,8 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
     const missingSyn = !item.synopsis || item.synopsis.trim() === '';
     const missingGenres = !Array.isArray(item.genres) || item.genres.length === 0;
     const missingLang = (item.category === 'Series & Anime' || !item.category) && (!item.titleEnglish || !item.titleRomaji);
-    return missingStudio || missingDate || missingSyn || missingGenres || missingLang;
+    const missingGameMetadata = item.category === 'Games' && (!item.totalUnits || item.totalUnits === 1 || item.totalUnits === 12 || item.unitName !== 'hrs');
+    return missingStudio || missingDate || missingSyn || missingGenres || missingLang || missingGameMetadata;
   });
 
   if (targets.length === 0) {
@@ -975,7 +1483,7 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
   // 1. Enrich Games (CheapShark + Steam 600x900 + Wikipedia VG)
   for (const item of gameItems) {
     if (state.enrichStopRequested) break;
-    if (statusText) statusText.textContent = `🎮 [Games] Auto-filling Steam Box Art & Studio (${processed + 1} / ${targets.length})...`;
+    if (statusText) statusText.textContent = `🎮 [Games] Auto-filling Steam Box Art, Genres & Story Length (${processed + 1} / ${targets.length})...`;
     const didChange = await enrichGameItem(item, forceAll);
     if (didChange) updatedCount++;
     processed++;
