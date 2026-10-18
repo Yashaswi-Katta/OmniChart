@@ -160,6 +160,8 @@ async function searchGamesApi(cleanTitle, signal) {
 
         results.push({
           title: g.external,
+          titleEnglish: g.external,
+          titleRomaji: '',
           category: 'Games',
           totalUnits: 1,
           unitName: 'hrs',
@@ -174,6 +176,8 @@ async function searchGamesApi(cleanTitle, signal) {
       for (const w of parsedWiki) {
         results.push({
           title: w.rawTitle,
+          titleEnglish: w.rawTitle,
+          titleRomaji: '',
           category: 'Games',
           totalUnits: 1,
           unitName: 'hrs',
@@ -222,6 +226,8 @@ async function searchMoviesApi(cleanTitle, signal) {
           : '';
         results.push({
           title: m.trackName,
+          titleEnglish: m.trackName,
+          titleRomaji: '',
           category: 'Movies',
           totalUnits: 1,
           unitName: 'movie',
@@ -243,7 +249,7 @@ async function searchMoviesApi(cleanTitle, signal) {
         const studio = (anim.length ? anim : allNames).slice(0, 2).join(', ') || 'Unknown Studio';
         results.push({
           title: m.title?.english || m.title?.romaji || cleanTitle,
-          titleEnglish: m.title?.english || '',
+          titleEnglish: m.title?.english || m.title?.romaji || cleanTitle,
           titleRomaji: m.title?.romaji || '',
           category: 'Movies',
           totalUnits: 1,
@@ -296,7 +302,7 @@ async function searchSeriesApi(cleanTitle, signal) {
         const studio = (anim.length ? anim : allNames).slice(0, 2).join(', ') || 'Unknown Studio';
         results.push({
           title: m.title?.english || m.title?.romaji || cleanTitle,
-          titleEnglish: m.title?.english || '',
+          titleEnglish: m.title?.english || m.title?.romaji || cleanTitle,
           titleRomaji: m.title?.romaji || '',
           category: isMovie ? 'Movies' : 'Series & Anime',
           totalUnits: isMovie ? 1 : (m.episodes || 12),
@@ -319,6 +325,8 @@ async function searchSeriesApi(cleanTitle, signal) {
         const poster = show.image?.original || show.image?.medium || '';
         results.push({
           title: show.name,
+          titleEnglish: show.name,
+          titleRomaji: '',
           category: 'Series & Anime',
           totalUnits: 12,
           unitName: 'eps',
@@ -375,6 +383,8 @@ async function searchBooksApi(cleanTitle, signal) {
         const authors = Array.isArray(v.authors) ? v.authors.join(', ') : (v.publisher || 'Unknown Author');
         results.push({
           title: v.title || cleanTitle,
+          titleEnglish: v.title || cleanTitle,
+          titleRomaji: '',
           category: 'Books',
           totalUnits: v.pageCount || 1,
           unitName: 'chs',
@@ -394,7 +404,7 @@ async function searchBooksApi(cleanTitle, signal) {
         const creator = staffNodes[0]?.name?.full || 'Unknown Creator';
         results.push({
           title: m.title?.english || m.title?.romaji || cleanTitle,
-          titleEnglish: m.title?.english || '',
+          titleEnglish: m.title?.english || m.title?.romaji || cleanTitle,
           titleRomaji: m.title?.romaji || '',
           category: 'Books',
           totalUnits: m.chapters || m.volumes || 1,

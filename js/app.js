@@ -405,6 +405,16 @@ function renderNavigation() {
   }
 
   // Update Toolbar Toggles (L7, L9, L10)
+  const isAnimeCategory = state.category === 'All' || state.category.includes('Anime');
+  const langToggleBtn = document.getElementById('titleLangToggleBtn');
+  if (langToggleBtn) {
+    langToggleBtn.classList.toggle('hidden', !isAnimeCategory);
+  }
+  const menuLangBtn = document.getElementById('menuTitleLangBtn');
+  if (menuLangBtn) {
+    menuLangBtn.classList.toggle('hidden', !isAnimeCategory);
+  }
+
   const langBadge = document.getElementById('titleLangBadge');
   const langText  = document.getElementById('titleLangText');
   if (langBadge) langBadge.textContent = state.titleLang === 'romaji' ? 'JA' : 'EN';
@@ -1263,35 +1273,44 @@ function renderCalendar() {
     const dateStr   = `${d}-${state.calMonth + 1}-${state.calYear}`;
 
     cells.push(`
-      <div class="min-h-[115px] rounded-xl bg-[#2c3539] border ${isToday ? 'border-2 border-amber-400 shadow-[0_0_15px_rgba(255,159,28,0.25)] ring-1 ring-amber-400/40' : 'border-[#3d494f]'} p-2 flex flex-col justify-between">
+      <div class="group min-h-[105px] rounded-xl bg-[#2c3539]/80 hover:bg-[#2c3539] border ${
+        isToday
+          ? 'border-2 border-amber-400 shadow-[0_0_15px_rgba(255,159,28,0.25)] ring-1 ring-amber-400/40'
+          : 'border-[#3d494f]/70 hover:border-[#3d494f]'
+      } p-2 flex flex-col justify-between transition">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold ${isToday ? 'px-2 py-0.5 rounded bg-amber-400 text-[#0d0e11] font-extrabold shadow' : 'text-slate-300'}">${d}</span>
+          <span class="text-xs font-bold ${
+            isToday
+              ? 'px-2 py-0.5 rounded-md bg-amber-400 text-[#0d0e11] font-extrabold shadow'
+              : 'text-slate-300'
+          }">${d}</span>
           ${isOwner ? `
             <button
               data-action="add-on-date"
               data-date="${dateStr}"
-              title="Add Media on ${dateStr}"
-              class="w-7 h-7 sm:w-6 sm:h-6 rounded-lg bg-[#0d0e11] hover:bg-[#ff9f1c] text-white hover:text-[#0d0e11] text-xs font-extrabold flex items-center justify-center border border-[#3d494f] hover:border-[#ff9f1c] transition shadow-sm"
+              title="Add media on ${dateStr}"
+              class="w-6 h-6 rounded-md bg-[#0d0e11] hover:bg-[#ff9f1c] text-slate-400 hover:text-[#0d0e11] text-xs font-bold flex items-center justify-center border border-[#3d494f] hover:border-[#ff9f1c] opacity-0 group-hover:opacity-100 transition shadow-sm"
             >+</button>
           ` : ''}
         </div>
-        <div class="space-y-1 mt-1.5 overflow-y-auto max-h-[82px] no-scrollbar">
+        <div class="space-y-1 mt-1.5 overflow-y-auto max-h-[75px] no-scrollbar">
           ${dayEvents.map(({ item, badge }) => {
-            const badgeCls = badge === 'DAY'
-              ? 'bg-[#ff9f1c] text-[#0d0e11]'
+            const dotCls = badge === 'DAY'
+              ? 'bg-[#ff9f1c]'
               : badge === 'START'
-                ? 'bg-emerald-400 text-[#0d0e11]'
-                : 'bg-sky-400 text-[#0d0e11]';
+                ? 'bg-emerald-400'
+                : 'bg-sky-400';
             const badgeLabel = badge === 'DAY' ? 'Day' : badge === 'START' ? 'Start' : 'End';
             const itemTitle = getItemTitle(item);
             return `
               <button
                 data-action="edit-item"
                 data-id="${esc(item.id)}"
-                class="w-full text-left p-1 rounded bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f] flex items-center gap-1.5 text-[11px]"
+                title="${badgeLabel}: ${esc(itemTitle)}"
+                class="w-full text-left px-1.5 py-1 rounded-md bg-[#0d0e11] hover:bg-[#364146] border border-[#3d494f]/60 hover:border-[#ff9f1c]/60 flex items-center gap-1.5 text-[11px] transition shadow-xs"
               >
-                <span class="px-1 rounded text-[9px] font-extrabold ${badgeCls}">${badgeLabel}</span>
-                <span class="truncate text-slate-100 font-medium">${esc(itemTitle)}</span>
+                <span class="w-2 h-2 rounded-full ${dotCls} shrink-0"></span>
+                <span class="truncate text-slate-200 font-medium">${esc(itemTitle)}</span>
               </button>
             `;
           }).join('')}
@@ -2063,6 +2082,7 @@ function renderModalGenreTags() {
   }
 
   renderPopularGenresTray(currentGenreTrayCategory);
+  updateRomajiFieldVisibility();
 }
 
 function addGenreToModal(genreName) {
@@ -2228,6 +2248,28 @@ function updateCategoryAwareFormFields() {
       .join('');
     statusSel.value = curStatus;
   }
+
+  updateRomajiFieldVisibility();
+}
+
+/** Only include Romaji Title field when the media is an anime */
+function updateRomajiFieldVisibility() {
+  const cat = document.getElementById('fieldCategory')?.value || 'Series & Anime';
+  const isAnime = cat.includes('Anime') ||
+    (Array.isArray(currentModalGenres) && currentModalGenres.some((g) => /anime/i.test(g))) ||
+    Boolean(document.getElementById('fieldTitleRomaji')?.value?.trim());
+
+  const romContainer = document.getElementById('fieldTitleRomajiContainer');
+  const grid = document.getElementById('bilingualTitlesGrid');
+
+  if (romContainer) {
+    romContainer.classList.toggle('hidden', !isAnime);
+  }
+  if (grid) {
+    grid.className = isAnime
+      ? 'grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs'
+      : 'grid grid-cols-1 gap-2 text-xs';
+  }
 }
 
 function checkDuplicateTitle(title, currentId) {
@@ -2332,7 +2374,7 @@ function openMediaModal(item = null, presetDate = '') {
     if (endRow)      endRow.classList.add('hidden');
   }
 
-  state.currentModalTitleEnglish = item?.titleEnglish || '';
+  state.currentModalTitleEnglish = item?.titleEnglish || item?.title || '';
   state.currentModalTitleRomaji  = item?.titleRomaji || '';
 
   if (item && (!state.currentModalTitleEnglish || !state.currentModalTitleRomaji)) {
@@ -2341,6 +2383,9 @@ function openMediaModal(item = null, presetDate = '') {
       if (!state.currentModalTitleEnglish && match.english) state.currentModalTitleEnglish = match.english;
       if (!state.currentModalTitleRomaji && match.romaji) state.currentModalTitleRomaji = match.romaji;
     }
+  }
+  if (item && !state.currentModalTitleEnglish) {
+    state.currentModalTitleEnglish = item.title || '';
   }
 
   const fieldTitleEnglish = document.getElementById('fieldTitleEnglish');
@@ -2378,6 +2423,7 @@ function openMediaModal(item = null, presetDate = '') {
     currentModalGenres = Array.isArray(item.genres)
       ? [...item.genres]
       : (item.genres ? String(item.genres).split(',').map((s) => s.trim()).filter(Boolean) : []);
+    updateRomajiFieldVisibility();
   } else {
     document.getElementById('modalTitle').textContent     = 'Add Media';
     document.getElementById('fieldId').value              = '';
@@ -2534,16 +2580,26 @@ function saveMediaFromModal() {
 
   const fieldEngEl = document.getElementById('fieldTitleEnglish');
   const fieldRomEl = document.getElementById('fieldTitleRomaji');
-  let titleEnglish = (fieldEngEl ? fieldEngEl.value.trim() : '') || state.currentModalTitleEnglish || existingItem?.titleEnglish || '';
+  let titleEnglish = (fieldEngEl ? fieldEngEl.value.trim() : '') || state.currentModalTitleEnglish || existingItem?.titleEnglish || title || '';
   let titleRomaji  = (fieldRomEl ? fieldRomEl.value.trim() : '') || state.currentModalTitleRomaji  || existingItem?.titleRomaji  || '';
 
+  // Only retain Romaji title when it is an anime
+  const isAnimeItem = category.includes('Anime') ||
+    (Array.isArray(genres) && genres.some((g) => /anime/i.test(g)));
+  if (!isAnimeItem) {
+    titleRomaji = '';
+  }
+
   // Auto-resolve bilingual titles from dictionary if still missing
-  if (!titleEnglish || !titleRomaji) {
+  if (isAnimeItem && (!titleEnglish || !titleRomaji)) {
     const match = lookupBilingualTitle(title) || lookupBilingualTitle(id);
     if (match) {
       if (!titleEnglish && match.english) titleEnglish = match.english;
       if (!titleRomaji && match.romaji) titleRomaji = match.romaji;
     }
+  }
+  if (!titleEnglish) {
+    titleEnglish = title;
   }
 
   const fieldFav = document.getElementById('fieldFavorite');
@@ -3492,7 +3548,7 @@ document.addEventListener('click', async (e) => {
   } else if (action === 'pick-search-result') {
     const r = (window._lastSearchResults || [])[parseInt(btn.dataset.idx, 10)];
     if (r) {
-      state.currentModalTitleEnglish = r.titleEnglish || '';
+      state.currentModalTitleEnglish = r.titleEnglish || r.title || '';
       state.currentModalTitleRomaji  = r.titleRomaji || '';
 
       if (!state.currentModalTitleEnglish || !state.currentModalTitleRomaji) {
@@ -3502,11 +3558,22 @@ document.addEventListener('click', async (e) => {
           if (!state.currentModalTitleRomaji && match.romaji) state.currentModalTitleRomaji = match.romaji;
         }
       }
+      if (!state.currentModalTitleEnglish) {
+        state.currentModalTitleEnglish = r.title || '';
+      }
+
+      // Only include Romaji when it is an anime
+      const isAnimeResult = (r.category || '').includes('Anime') ||
+        (Array.isArray(r.genres) && r.genres.some((g) => /anime/i.test(g))) ||
+        Boolean(state.currentModalTitleRomaji);
+      if (!isAnimeResult) {
+        state.currentModalTitleRomaji = '';
+      }
 
       const fieldEng = document.getElementById('fieldTitleEnglish');
       const fieldRom = document.getElementById('fieldTitleRomaji');
       if (fieldEng) {
-        fieldEng.value = state.currentModalTitleEnglish || '';
+        fieldEng.value = state.currentModalTitleEnglish;
         delete fieldEng.dataset.userEdited;
       }
       if (fieldRom) {
@@ -3514,7 +3581,7 @@ document.addEventListener('click', async (e) => {
         delete fieldRom.dataset.userEdited;
       }
 
-      const chosenTitle = (state.titleLang === 'romaji')
+      const chosenTitle = (state.titleLang === 'romaji' && state.currentModalTitleRomaji)
         ? (state.currentModalTitleRomaji || state.currentModalTitleEnglish || r.title || '')
         : (state.currentModalTitleEnglish || state.currentModalTitleRomaji || r.title || '');
 
@@ -4243,17 +4310,26 @@ if (modalTitleInput) {
     const curId = document.getElementById('fieldId')?.value || '';
     checkDuplicateTitle(val, curId);
 
+    const fieldEng = document.getElementById('fieldTitleEnglish');
+    const fieldRom = document.getElementById('fieldTitleRomaji');
     if (val) {
       const match = lookupBilingualTitle(val);
       if (match) {
-        const fieldEng = document.getElementById('fieldTitleEnglish');
-        const fieldRom = document.getElementById('fieldTitleRomaji');
         if (fieldEng && !fieldEng.dataset.userEdited && match.english) {
           fieldEng.value = match.english;
         }
         if (fieldRom && !fieldRom.dataset.userEdited && match.romaji) {
           fieldRom.value = match.romaji;
         }
+      } else {
+        if (fieldEng && !fieldEng.dataset.userEdited) {
+          fieldEng.value = val;
+        }
+      }
+      updateRomajiFieldVisibility();
+    } else {
+      if (fieldEng && !fieldEng.dataset.userEdited) {
+        fieldEng.value = '';
       }
     }
   });
