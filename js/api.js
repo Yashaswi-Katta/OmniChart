@@ -274,15 +274,20 @@ const POPULAR_GAME_BENCHMARKS = {
   'devil may cry 5': { hours: 11, genres: ['Hack and slash', 'Action'] },
 
   // Konami & Kojima
-  'metal gear solid': { hours: 11, genres: ['Stealth', 'Action-adventure'] },
-  'metal gear solid 2 sons of liberty': { hours: 13, genres: ['Stealth', 'Action-adventure'] },
-  'metal gear solid 3 snake eater': { hours: 16, genres: ['Stealth', 'Action-adventure'] },
-  'metal gear solid 4 guns of the patriots': { hours: 18, genres: ['Stealth', 'Third-person shooter'] },
-  'metal gear solid v the phantom pain': { hours: 46, genres: ['Stealth', 'Open World', 'Third-person shooter'] },
-  'metal gear solid 5 the phantom pain': { hours: 46, genres: ['Stealth', 'Open World', 'Third-person shooter'] },
-  'silent hill 2': { hours: 9, genres: ['Survival horror', 'Psychological horror'] },
-  'silent hill 2 remake': { hours: 16, genres: ['Survival horror', 'Psychological horror'] },
-  'castlevania symphony of the night': { hours: 9, genres: ['Metroidvania', 'Platformer', 'Dark Fantasy'] },
+  'metal gear solid': { hours: 11, year: '1998', studio: 'Konami', genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 2 sons of liberty': { hours: 13, year: '2001', studio: 'Konami', genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 2': { hours: 13, year: '2001', studio: 'Konami', genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 3 snake eater': { hours: 16, year: '2004', studio: 'Konami', genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 3': { hours: 16, year: '2004', studio: 'Konami', genres: ['Stealth', 'Action-adventure'] },
+  'metal gear solid 4 guns of the patriots': { hours: 18, year: '2008', studio: 'Kojima Productions', genres: ['Stealth', 'Third-person shooter'] },
+  'metal gear solid 4': { hours: 18, year: '2008', studio: 'Kojima Productions', genres: ['Stealth', 'Third-person shooter'] },
+  'metal gear solid v the phantom pain': { hours: 46, year: '2015', studio: 'Kojima Productions', genres: ['Stealth', 'Open World', 'Third-person shooter'] },
+  'metal gear solid 5 the phantom pain': { hours: 46, year: '2015', studio: 'Kojima Productions', genres: ['Stealth', 'Open World', 'Third-person shooter'] },
+  'metal gear solid v ground zeroes': { hours: 2, year: '2014', studio: 'Kojima Productions', genres: ['Stealth', 'Third-person shooter'] },
+  'metal gear solid peace walker': { hours: 18, year: '2010', studio: 'Kojima Productions', genres: ['Stealth', 'Action-adventure'] },
+  'silent hill 2': { hours: 9, year: '2001', studio: 'Konami', genres: ['Survival horror', 'Psychological horror'] },
+  'silent hill 2 remake': { hours: 16, year: '2024', studio: 'Bloober Team', genres: ['Survival horror', 'Psychological horror'] },
+  'castlevania symphony of the night': { hours: 9, year: '1997', studio: 'Konami', genres: ['Metroidvania', 'Platformer', 'Dark Fantasy'] },
 
   // EA & Respawn
   'titanfall 2': { hours: 6, genres: ['First-person shooter', 'Sci-Fi', 'Platformer'] },
@@ -383,23 +388,192 @@ function normalizeGameKey(title) {
     .trim();
 }
 
-/** Check benchmark table for exact or close title match */
+/**
+ * Extract installment number (Arabic or Roman numeral) from normalized title string.
+ * Returns integer (1 to 9) or 0 if unnumbered/standalone.
+ */
+function getGameInstallmentNum(str) {
+  if (!str) return 0;
+  const s = ' ' + str.toLowerCase() + ' ';
+  if (/\b(?:viii|8)\b/.test(s)) return 8;
+  if (/\b(?:vii|7)\b/.test(s)) return 7;
+  if (/\b(?:vi|6)\b/.test(s)) return 6;
+  if (/\b(?:v|5)\b/.test(s)) return 5;
+  if (/\b(?:iv|4)\b/.test(s)) return 4;
+  if (/\b(?:iii|3)\b/.test(s)) return 3;
+  if (/\b(?:ii|2)\b/.test(s)) return 2;
+  if (/\b(?:i|1)\b/.test(s) && !/\b(?:part|act|volume|vol)\b/.test(s)) return 1;
+  return 0;
+}
+
+/** Check benchmark table with strict installment awareness */
 function lookupGameBenchmark(title) {
   const norm = normalizeGameKey(title);
   if (!norm) return null;
 
+  // 1. Exact match
   if (POPULAR_GAME_BENCHMARKS[norm]) {
     return POPULAR_GAME_BENCHMARKS[norm];
   }
 
-  // Substring or prefix match
-  const keys = Object.keys(POPULAR_GAME_BENCHMARKS);
+  // 2. Roman/Arabic numeral variation exact match (e.g. "dark souls 2" <-> "dark souls ii")
+  const numT = getGameInstallmentNum(norm);
+  const romanMap = { 2: 'ii', 3: 'iii', 4: 'iv', 5: 'v', 6: 'vi', 7: 'vii', 8: 'viii' };
+  const arabicMap = { 'ii': '2', 'iii': '3', 'iv': '4', 'v': '5', 'vi': '6', 'vii': '7', 'viii': '8' };
+
+  if (numT > 1) {
+    if (romanMap[numT]) {
+      const swappedRoman = norm.replace(new RegExp(`\\b${numT}\\b`), romanMap[numT]);
+      if (POPULAR_GAME_BENCHMARKS[swappedRoman]) return POPULAR_GAME_BENCHMARKS[swappedRoman];
+    }
+    for (const [rom, ara] of Object.entries(arabicMap)) {
+      if (new RegExp(`\\b${rom}\\b`).test(norm)) {
+        const swappedAra = norm.replace(new RegExp(`\\b${rom}\\b`), ara);
+        if (POPULAR_GAME_BENCHMARKS[swappedAra]) return POPULAR_GAME_BENCHMARKS[swappedAra];
+      }
+    }
+  }
+
+  // 3. Substring or prefix match with strict installment guard
+  // Sort keys by length DESCENDING so more specific installments are tested first
+  const keys = Object.keys(POPULAR_GAME_BENCHMARKS).sort((a, b) => b.length - a.length);
   for (const k of keys) {
+    const numK = getGameInstallmentNum(k);
+    // Never allow a sequel to match the base game or a different sequel
+    if (numT !== numK) continue;
+
     if (norm === k || norm.startsWith(k + ' ') || k.startsWith(norm + ' ')) {
       return POPULAR_GAME_BENCHMARKS[k];
     }
   }
   return null;
+}
+
+/**
+ * Score how well a candidate Wikipedia article matches the target game title.
+ * Prevents generic franchise pages or earlier installments from clobbering sequels
+ * (e.g., stops Metal Gear Solid 1998 from matching Metal Gear Solid 2, 3, 4, V).
+ */
+function scoreWikiGameMatch(targetTitle, candidateTitle, candidateExtract = '') {
+  if (!targetTitle || !candidateTitle) return -1000;
+
+  const normT = normalizeGameKey(targetTitle);
+  const normC = normalizeGameKey(candidateTitle);
+
+  // Franchise/Series overview page penalty
+  const isSeriesPage = /\b(?:series|franchise)\b/i.test(candidateTitle) ||
+    /is an? (?:action-adventure|role-playing|stealth|video game|multimedia)?\s*(?:video game )?(?:series|media franchise|franchise)\b/i.test(candidateExtract) ||
+    /is a series of\b/i.test(candidateExtract);
+  if (isSeriesPage) {
+    return -600;
+  }
+
+  // Exact normalized match
+  if (normT === normC) {
+    return 1000;
+  }
+
+  const numT = getGameInstallmentNum(normT);
+  const numC = getGameInstallmentNum(normC);
+
+  // Disqualify if installment numbers conflict
+  if (numT !== 0 && numC !== 0 && numT !== numC) {
+    return -1000;
+  }
+  // Target has a sequel number (e.g. MGS 2), but candidate does not (e.g. MGS 1)
+  if (numT !== 0 && numC === 0 && !/\b(?:delta|remake|definitive|remastered)\b/i.test(normC)) {
+    return -500;
+  }
+  // Target is base game without number, but candidate is a numbered sequel
+  if (numT === 0 && numC !== 0) {
+    return -500;
+  }
+
+  // Word token overlap
+  const tokensT = normT.split(' ').filter(Boolean);
+  const tokensC = normC.split(' ').filter(Boolean);
+  let matchCount = 0;
+  for (const tok of tokensT) {
+    if (tokensC.includes(tok)) matchCount++;
+  }
+  let score = matchCount * 50;
+
+  // Matching installment number bonus
+  if (numT !== 0 && numT === numC) {
+    score += 350;
+  }
+
+  // Distinctive subtitle matching
+  const knownSubtitles = [
+    'snake eater', 'sons of liberty', 'phantom pain', 'ground zeroes',
+    'guns of the patriots', 'peace walker', 'twin snakes', 'solid snake',
+    'assassins of kings', 'wild hunt', 'shadow of the erdtree', 'scholar of the first sin',
+    'the ringed city', 'blood and wine', 'hearts of stone', 'phantom liberty',
+    'ragnarok', 'miles morales', 'drakes fortune', 'among thieves',
+    'drakes deception', 'thiefs end', 'infinite wealth', 'like a dragon',
+    'space marine', 'fires of rubicon', 'tactics', 'portable ops'
+  ];
+
+  for (const sub of knownSubtitles) {
+    const hasT = normT.includes(sub);
+    const hasC = normC.includes(sub);
+    if (hasT && hasC) {
+      score += 500;
+    } else if (hasT && !hasC) {
+      score -= 800;
+    } else if (!hasT && hasC) {
+      score -= 500;
+    }
+  }
+
+  return score;
+}
+
+/** Pick best matching Wikipedia page among candidates for a game title */
+function findBestMatchingWikiGame(targetTitle, wikiPages) {
+  if (!Array.isArray(wikiPages) || wikiPages.length === 0) return null;
+
+  let bestPage = null;
+  let bestScore = 50; // Minimum threshold to prevent arbitrary matching
+
+  for (const p of wikiPages) {
+    const pageTitle = (p.title || p.rawTitle || '').replace(/\s*\([^)]*game[^)]*\)/gi, '').trim();
+    const extract = p.extract || p.synopsis || '';
+    const score = scoreWikiGameMatch(targetTitle, pageTitle, extract);
+    if (score > bestScore) {
+      bestScore = score;
+      bestPage = p;
+    }
+  }
+
+  return bestPage;
+}
+
+/**
+ * Detect if a game item in the library has clobbered series metadata from an earlier installment
+ * (e.g., MGS 2 / 3 / 4 / V having 1998 release date or MGS 1 synopsis).
+ */
+function isGameInstallmentMismatched(item) {
+  if (!item || item.category !== 'Games' || !item.title) return false;
+
+  const bench = lookupGameBenchmark(item.title);
+  if (bench && bench.year && item.releaseDate && item.releaseDate !== 'TBA' && item.releaseDate !== bench.year) {
+    return true;
+  }
+
+  const normTitle = normalizeGameKey(item.title);
+  const num = getGameInstallmentNum(normTitle);
+
+  // If title has a sequel number (e.g. 2, 3, 4, 5) but synopsis describes original/different installment
+  if (num > 1 && item.synopsis) {
+    const synNorm = normalizeGameKey(item.synopsis.slice(0, 140));
+    const synNum = getGameInstallmentNum(synNorm);
+    if (synNum === 1 || (synNum > 0 && synNum !== num)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** Extract single-player campaign or main story duration from Wikipedia text */
@@ -588,7 +762,7 @@ async function searchGamesApi(cleanTitle, signal) {
       fetch(
         `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(
           cleanTitle + ' video game'
-        )}&gsrlimit=4&prop=pageimages|extracts|categories&cllimit=40&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`,
+        )}&gsrlimit=10&prop=pageimages|extracts|categories&cllimit=40&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`,
         { signal }
       ).then((r) => (r.ok ? r.json() : {}))
     ]);
@@ -602,7 +776,8 @@ async function searchGamesApi(cleanTitle, signal) {
       return {
         rawTitle,
         ...meta,
-        thumbnail: p.thumbnail?.source || ''
+        thumbnail: p.thumbnail?.source || '',
+        isSeriesPage: /is a video game series|is a series of video games|is a franchise|video game franchise|\(series\)/i.test((p.title || '') + ' ' + (p.extract || ''))
       };
     });
 
@@ -611,20 +786,33 @@ async function searchGamesApi(cleanTitle, signal) {
         const steamCover = g.steamAppID
           ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${g.steamAppID}/library_600x900.jpg`
           : (g.thumb || '');
-        const matchedWiki = parsedWiki.find(
-          (w) =>
-            w.rawTitle.toLowerCase() === g.external.toLowerCase() ||
-            w.rawTitle.toLowerCase().includes(g.external.toLowerCase()) ||
-            g.external.toLowerCase().includes(w.rawTitle.toLowerCase())
-        ) || parsedWiki[0];
-
-        // Enrich genres & story length in hours
+        let matchedWiki = findBestMatchingWikiGame(g.external, parsedWiki);
         const benchmark = lookupGameBenchmark(g.external);
+
+        // If candidate release year strongly contradicts curated benchmark (>1 year apart), candidate is the wrong game
+        if (benchmark?.year && matchedWiki?.releaseDate && matchedWiki.releaseDate !== 'TBA') {
+          const wikiY = parseInt(matchedWiki.releaseDate, 10);
+          const benchY = parseInt(benchmark.year, 10);
+          if (!isNaN(wikiY) && !isNaN(benchY) && Math.abs(wikiY - benchY) > 1) {
+            matchedWiki = null;
+          }
+        }
+
+        const finalStudio = (matchedWiki?.studio && matchedWiki.studio !== 'Unknown Developer')
+          ? matchedWiki.studio
+          : (benchmark?.studio || 'Unknown Developer');
+
+        const finalReleaseDate = (matchedWiki?.releaseDate && matchedWiki.releaseDate !== 'TBA')
+          ? matchedWiki.releaseDate
+          : (benchmark?.year || 'TBA');
+
         let finalGenres = matchedWiki?.genres || [];
         if (finalGenres.length === 0 && benchmark?.genres) {
           finalGenres = [...benchmark.genres];
         }
-        const finalHours = getGameStoryLength(g.external, matchedWiki?.synopsis || '', finalGenres);
+
+        const finalHours = benchmark?.hours || getGameStoryLength(g.external, matchedWiki?.synopsis || '', finalGenres);
+        const finalSynopsis = matchedWiki?.synopsis || '';
 
         results.push({
           title: g.external,
@@ -633,21 +821,29 @@ async function searchGamesApi(cleanTitle, signal) {
           category: 'Games',
           totalUnits: finalHours,
           unitName: 'hrs',
-          studio: matchedWiki?.studio || 'Unknown Developer',
-          releaseDate: matchedWiki?.releaseDate || 'TBA',
+          studio: finalStudio,
+          releaseDate: finalReleaseDate,
           genres: finalGenres,
           image: steamCover || matchedWiki?.thumbnail || '',
-          synopsis: matchedWiki?.synopsis || ''
+          synopsis: finalSynopsis
         });
       }
     } else if (parsedWiki.length > 0) {
       for (const w of parsedWiki) {
+        if (w.isSeriesPage && parsedWiki.some((p) => !p.isSeriesPage)) continue;
         const benchmark = lookupGameBenchmark(w.rawTitle);
+        const finalStudio = (w.studio && w.studio !== 'Unknown Developer')
+          ? w.studio
+          : (benchmark?.studio || 'Unknown Developer');
+        const finalReleaseDate = (w.releaseDate && w.releaseDate !== 'TBA')
+          ? w.releaseDate
+          : (benchmark?.year || 'TBA');
+
         let finalGenres = w.genres || [];
         if (finalGenres.length === 0 && benchmark?.genres) {
           finalGenres = [...benchmark.genres];
         }
-        const finalHours = getGameStoryLength(w.rawTitle, w.synopsis || '', finalGenres);
+        const finalHours = benchmark?.hours || getGameStoryLength(w.rawTitle, w.synopsis || '', finalGenres);
 
         results.push({
           title: w.rawTitle,
@@ -656,8 +852,8 @@ async function searchGamesApi(cleanTitle, signal) {
           category: 'Games',
           totalUnits: finalHours,
           unitName: 'hrs',
-          studio: w.studio,
-          releaseDate: w.releaseDate,
+          studio: finalStudio,
+          releaseDate: finalReleaseDate,
           genres: finalGenres,
           image: w.thumbnail,
           synopsis: w.synopsis
@@ -1158,27 +1354,49 @@ async function enrichGameItem(item, forceAll = false) {
   const cleanTitle = getCleanSearchTitle(item.title);
   let changed = false;
   const edited = item._manualFields || [];
+  const isMismatched = isGameInstallmentMismatched(item);
 
   try {
     const [sharkRes, wikiRes] = await Promise.allSettled([
-      fetch(`https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(cleanTitle)}&limit=3`)
+      fetch(`https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(cleanTitle)}&limit=5`)
         .then((r) => (r.ok ? r.json() : [])),
       fetch(
         `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(
           cleanTitle + ' video game'
-        )}&gsrlimit=2&prop=pageimages|extracts|categories&cllimit=40&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`
+        )}&gsrlimit=8&prop=pageimages|extracts|categories&cllimit=40&pilicense=any&exintro=1&explaintext=1&exchars=420&piprop=thumbnail&pithumbsize=600`
       ).then((r) => (r.ok ? r.json() : {}))
     ]);
 
     const sharkGames = sharkRes.status === 'fulfilled' && Array.isArray(sharkRes.value) ? sharkRes.value : [];
     const wikiPages = wikiRes.status === 'fulfilled' ? Object.values(wikiRes.value?.query?.pages || {}) : [];
-    const wikiData = wikiPages.length > 0 ? {
-      ...parseWikiGameMetadata(wikiPages[0].extract || '', wikiPages[0].categories || []),
-      thumbnail: wikiPages[0].thumbnail?.source || ''
+    const bestWikiPage = findBestMatchingWikiGame(item.title, wikiPages);
+    const wikiData = bestWikiPage ? {
+      ...parseWikiGameMetadata(bestWikiPage.extract || '', bestWikiPage.categories || []),
+      thumbnail: bestWikiPage.thumbnail?.source || ''
     } : null;
 
+    const benchmark = lookupGameBenchmark(item.title);
+
+    // If candidate release year strongly contradicts curated benchmark (>1 year apart), candidate is the wrong game
+    if (benchmark?.year && wikiData?.releaseDate && wikiData.releaseDate !== 'TBA') {
+      const wikiY = parseInt(wikiData.releaseDate, 10);
+      const benchY = parseInt(benchmark.year, 10);
+      if (!isNaN(wikiY) && !isNaN(benchY) && Math.abs(wikiY - benchY) > 1) {
+        wikiData = null;
+      }
+    }
+
     if (!item.image || forceAll) {
-      const steamMatch = sharkGames.find((g) => g.steamAppID);
+      const steamMatch = sharkGames.find((g) => {
+        if (!g.steamAppID) return false;
+        const normG = normalizeGameKey(g.external);
+        const normT = normalizeGameKey(item.title);
+        const numG = getGameInstallmentNum(normG);
+        const numT = getGameInstallmentNum(normT);
+        if (numT > 0 && numG > 0 && numG !== numT) return false;
+        return normG.includes(normT) || normT.includes(normG);
+      }) || sharkGames.find((g) => g.steamAppID);
+
       if (steamMatch) {
         item.image = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamMatch.steamAppID}/library_600x900.jpg`;
         changed = true;
@@ -1191,35 +1409,53 @@ async function enrichGameItem(item, forceAll = false) {
       }
     }
 
-    if (wikiData) {
-      if (!edited.includes('studio') && (!item.studio || item.studio === 'Unknown Studio' || item.studio === 'Wikipedia' || forceAll)) {
-        if (wikiData.studio && wikiData.studio !== 'Unknown Developer') {
-          item.studio = wikiData.studio;
-          changed = true;
+    if (wikiData || benchmark) {
+      if (!edited.includes('studio') && (!item.studio || item.studio === 'Unknown Studio' || item.studio === 'Wikipedia' || isMismatched || forceAll)) {
+        if (wikiData?.studio && wikiData.studio !== 'Unknown Developer') {
+          if (item.studio !== wikiData.studio) {
+            item.studio = wikiData.studio;
+            changed = true;
+          }
+        } else if (benchmark?.studio) {
+          if (item.studio !== benchmark.studio) {
+            item.studio = benchmark.studio;
+            changed = true;
+          }
         }
       }
-      if (!edited.includes('releaseDate') && (!item.releaseDate || item.releaseDate === 'TBA' || forceAll)) {
-        if (wikiData.releaseDate && wikiData.releaseDate !== 'TBA') {
-          item.releaseDate = wikiData.releaseDate;
-          changed = true;
+      if (!edited.includes('releaseDate') && (!item.releaseDate || item.releaseDate === 'TBA' || isMismatched || forceAll)) {
+        if (wikiData?.releaseDate && wikiData.releaseDate !== 'TBA') {
+          if (item.releaseDate !== wikiData.releaseDate) {
+            item.releaseDate = wikiData.releaseDate;
+            changed = true;
+          }
+        } else if (benchmark?.year) {
+          if (item.releaseDate !== benchmark.year) {
+            item.releaseDate = benchmark.year;
+            changed = true;
+          }
         }
       }
       if (!edited.includes('genres') && (!item.genres || item.genres.length === 0 || (item.genres.length === 1 && item.genres[0].toLowerCase() === 'uncategorized') || forceAll)) {
-        if (Array.isArray(wikiData.genres) && wikiData.genres.length > 0) {
+        if (Array.isArray(wikiData?.genres) && wikiData.genres.length > 0) {
           item.genres = wikiData.genres.slice(0, 4);
+          changed = true;
+        } else if (benchmark?.genres && benchmark.genres.length > 0) {
+          item.genres = [...benchmark.genres];
           changed = true;
         }
       }
-      if (!edited.includes('synopsis') && (!item.synopsis || item.synopsis.trim() === '' || forceAll)) {
-        if (wikiData.synopsis) {
-          item.synopsis = wikiData.synopsis;
-          changed = true;
+      if (!edited.includes('synopsis') && (!item.synopsis || item.synopsis.trim() === '' || isMismatched || forceAll)) {
+        if (wikiData?.synopsis) {
+          if (item.synopsis !== wikiData.synopsis) {
+            item.synopsis = wikiData.synopsis;
+            changed = true;
+          }
         }
       }
     }
 
     // Benchmark fallback if genres still empty
-    const benchmark = lookupGameBenchmark(item.title);
     if (!edited.includes('genres') && (!item.genres || item.genres.length === 0 || (item.genres.length === 1 && item.genres[0].toLowerCase() === 'uncategorized') || forceAll)) {
       if (benchmark?.genres && benchmark.genres.length > 0) {
         item.genres = [...benchmark.genres];
@@ -1231,18 +1467,20 @@ async function enrichGameItem(item, forceAll = false) {
     const currentGenres = (Array.isArray(item.genres) && item.genres.length > 0)
       ? item.genres
       : (wikiData?.genres || benchmark?.genres || []);
-    const storyHours = getGameStoryLength(item.title, wikiData?.synopsis || '', currentGenres);
+    const storyHours = benchmark?.hours || getGameStoryLength(item.title, wikiData?.synopsis || '', currentGenres);
 
     if (!edited.includes('unitName') && item.unitName !== 'hrs') {
       item.unitName = 'hrs';
       changed = true;
     }
 
-    if (!edited.includes('totalUnits') && (!item.totalUnits || item.totalUnits === 1 || item.totalUnits === 12 || forceAll)) {
+    if (!edited.includes('totalUnits') && (!item.totalUnits || item.totalUnits === 1 || item.totalUnits === 12 || isMismatched || forceAll)) {
       if (storyHours && storyHours > 0) {
         const oldTotal = item.totalUnits || 1;
-        item.totalUnits = storyHours;
-        changed = true;
+        if (item.totalUnits !== storyHours) {
+          item.totalUnits = storyHours;
+          changed = true;
+        }
         // If completed with old default progress, synchronize progress to full hours
         if (item.status === 'Completed' && (item.progress === oldTotal || item.progress === 1 || item.progress === 12 || item.progress === 0)) {
           item.progress = storyHours;
@@ -1451,7 +1689,7 @@ async function enrichMissingMetadata(forceAll = false, customTargets = null) {
     const missingSyn = !item.synopsis || item.synopsis.trim() === '';
     const missingGenres = !Array.isArray(item.genres) || item.genres.length === 0;
     const missingLang = (item.category === 'Series & Anime' || !item.category) && (!item.titleEnglish || !item.titleRomaji);
-    const missingGameMetadata = item.category === 'Games' && (!item.totalUnits || item.totalUnits === 1 || item.totalUnits === 12 || item.unitName !== 'hrs');
+    const missingGameMetadata = item.category === 'Games' && (!item.totalUnits || item.totalUnits === 1 || item.totalUnits === 12 || item.unitName !== 'hrs' || isGameInstallmentMismatched(item));
     return missingStudio || missingDate || missingSyn || missingGenres || missingLang || missingGameMetadata;
   });
 
