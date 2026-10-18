@@ -93,7 +93,10 @@ function parseSingleDDMMYYYY(str) {
   const d  = parseInt(m[1], 10);
   const mo = parseInt(m[2], 10);
   const y  = parseInt(m[3], 10);
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  if (mo < 1 || mo > 12 || d < 1) return null;
+  const isLeap = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+  const daysInMonth = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (d > daysInMonth[mo - 1]) return null;
   return { day: d, month: mo - 1, year: y, label: `${d}-${mo}-${y}` };
 }
 
@@ -107,6 +110,11 @@ function parseDateOrRange(raw) {
   const start = parseSingleDDMMYYYY(parts[0]);
   const end   = parseSingleDDMMYYYY(parts[1]);
   if (start && end) {
+    const startDate = new Date(start.year, start.month, start.day);
+    const endDate   = new Date(end.year, end.month, end.day);
+    if (startDate > endDate) {
+      return null;
+    }
     if (start.day === end.day && start.month === end.month && start.year === end.year) {
       return { type: 'single', start, end: null };
     }
@@ -2488,6 +2496,20 @@ function saveMediaFromModal() {
   }
 
   syncDatePickerToHiddenField();
+  const consumedDate = document.getElementById('fieldConsumedDate').value.trim();
+  if (consumedDate && consumedDate.includes('to')) {
+    const parts = consumedDate.split(/\s+to\s+/i);
+    const start = parseSingleDDMMYYYY(parts[0]);
+    const end   = parseSingleDDMMYYYY(parts[1]);
+    if (start && end) {
+      const startDate = new Date(start.year, start.month, start.day);
+      const endDate   = new Date(end.year, end.month, end.day);
+      if (startDate > endDate) {
+        showToast('Start date must be on or before end date');
+        return;
+      }
+    }
+  }
 
   const id         = document.getElementById('fieldId').value || ('id-' + Date.now());
   const category   = document.getElementById('fieldCategory').value;
@@ -2496,7 +2518,8 @@ function saveMediaFromModal() {
   const rating     = Math.min(10, Math.max(0, parseFloat(document.getElementById('fieldRating').value) || 0));
   const totalUnits = Math.max(1, parseInt(document.getElementById('fieldTotalUnits').value, 10) || 1);
   let   progress   = Math.max(0, parseInt(document.getElementById('fieldProgress').value, 10) || 0);
-  if (status === 'Completed') progress = totalUnits;
+  if (status === 'Completed' && progress === 0) progress = totalUnits;
+  if (progress > totalUnits) progress = totalUnits;
 
   const unitName = category === 'Movies' ? 'movie' : category === 'Books' ? 'chs' : category === 'Games' ? 'hrs' : 'eps';
   const genres   = [...currentModalGenres];
@@ -3210,6 +3233,8 @@ document.addEventListener('click', async (e) => {
       const statSel = document.getElementById('fieldStatus');
       if (tot > 0 && next >= tot && statSel && statSel.value === 'Ongoing') {
         statSel.value = 'Completed';
+      } else if (tot > 0 && next < tot && statSel && statSel.value === 'Completed') {
+        statSel.value = 'Ongoing';
       }
     }
   } else if (action === 'toggle-title-lang') {
@@ -3401,8 +3426,13 @@ document.addEventListener('click', async (e) => {
     if (!item) return;
     const delta = parseInt(btn.dataset.delta, 10);
     const total = Math.max(1, Number(item.totalUnits || 1));
-    item.progress = Math.min(total, Math.max(0, Number(item.progress || 0) + delta));
-    if (item.progress === total) item.status = 'Completed';
+    const prevProgress = Number(item.progress || 0);
+    item.progress = Math.min(total, Math.max(0, prevProgress + delta));
+    if (item.progress === total) {
+      item.status = 'Completed';
+    } else if (prevProgress === total && item.progress < total && item.status === 'Completed') {
+      item.status = 'Ongoing';
+    }
     item.updatedAt = Date.now();
     saveItems(true, item);
     renderAll();
@@ -3488,10 +3518,15 @@ document.addEventListener('click', async (e) => {
         ? (state.currentModalTitleRomaji || state.currentModalTitleEnglish || r.title || '')
         : (state.currentModalTitleEnglish || state.currentModalTitleRomaji || r.title || '');
 
-      document.getElementById('fieldTitle').value      = chosenTitle;
-      document.getElementById('fieldCategory').value   = r.category || 'Series & Anime';
-      document.getElementById('fieldTotalUnits').value  = r.totalUnits || 12;
-      document.getElementById('fieldProgress').value    = document.getElementById('fieldStatus').value === 'Completed' ? (r.totalUnits || 12) : 0;
+      document.getElementById('fieldTitle').value = chosenTitle;
+      const catField = document.getElementById('fieldCategory');
+      if (catField) {
+        catField.value = r.category || 'Series & Anime';
+        catField.dispatchEvent(new Event('change'));
+      }
+      const totalVal = r.totalUnits || (r.category === 'Movies' ? 1 : 12);
+      document.getElementById('fieldTotalUnits').value  = totalVal;
+      document.getElementById('fieldProgress').value    = document.getElementById('fieldStatus').value === 'Completed' ? totalVal : 0;
       document.getElementById('fieldStudio').value      = r.studio || '';
       document.getElementById('fieldReleaseDate').value = r.releaseDate || '';
       document.getElementById('fieldImage').value       = r.image || '';
@@ -3842,12 +3877,16 @@ document.addEventListener('click', async (e) => {
       btn.innerHTML = origText;
     }
   } else if (action === 'auth-sign-out') {
+    const keepLocal = confirm('Keep a copy of your library on this device for offline guest use?');
+    window._signingOutPromptHandled = true;
     await CloudSync.signOut();
-    state.items = [];
-    saveItems(false);
+    if (!keepLocal) {
+      state.items = [];
+      saveItems(false);
+    }
     renderAll();
     document.getElementById('authModal').classList.add('hidden');
-    showToast('Signed out. Switched to offline guest mode.');
+    showToast(keepLocal ? 'Signed out. Your library is kept for offline guest use.' : 'Signed out. Switched to clean guest mode.');
   } else if (action === 'show-forgot-password-view') {
     openAuthModal('forgot-password');
   } else if (action === 'show-sign-in-view') {

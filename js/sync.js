@@ -360,12 +360,21 @@ function sanitizeAndRecoverItems(list) {
 // ---------------------------------------------------------------------------
 
 function mergeLibraries(localList, remoteList) {
+  let deletedIds = new Set();
+  try {
+    const rawDel = localStorage.getItem('omnichart_offline_delete_queue');
+    if (rawDel) {
+      const arr = JSON.parse(rawDel);
+      if (Array.isArray(arr)) deletedIds = new Set(arr);
+    }
+  } catch (e) {}
+
   const byId = new Map();
   for (const item of (localList || [])) {
-    if (item && item.id) byId.set(item.id, item);
+    if (item && item.id && !deletedIds.has(item.id)) byId.set(item.id, item);
   }
   for (const remote of (remoteList || [])) {
-    if (!remote || !remote.id) continue;
+    if (!remote || !remote.id || deletedIds.has(remote.id)) continue;
     const local = byId.get(remote.id);
     if (!local) {
       byId.set(remote.id, remote);
@@ -425,7 +434,13 @@ function loadItems() {
 function saveItems(shouldPushCloud = true, subset = null) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
-  } catch (e) {}
+  } catch (e) {
+    if (e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) {
+      if (typeof showToast === 'function') {
+        showToast('Storage full! Export a backup or compress uploaded poster images.');
+      }
+    }
+  }
 
   // Push to cloud if user is signed in or cloud sync is configured
   if (shouldPushCloud && typeof CloudSync !== 'undefined' && CloudSync.push) {
@@ -672,14 +687,19 @@ function importLibraryJSON(file) {
       }
 
       const byId = new Map(state.items.map((i) => [i.id, i]));
-      const titleLookup = new Map(state.items.map((i) => [(i.title || '').toLowerCase().trim(), i]));
+      const titleLookup = new Map(
+        state.items.map((i) => [
+          `${(i.category || 'Series & Anime').toLowerCase()}::${(i.title || '').toLowerCase().trim()}`,
+          i
+        ])
+      );
 
       for (const raw of imported) {
         if (!raw || !raw.title) continue;
 
-        // Title deduplication check
-        const cleanTitle = (raw.title || '').toLowerCase().trim();
-        const existingByTitle = titleLookup.get(cleanTitle);
+        const cat = raw.category || 'Series & Anime';
+        const key = `${cat.toLowerCase()}::${(raw.title || '').toLowerCase().trim()}`;
+        const existingByTitle = titleLookup.get(key);
 
         const id = raw.id || existingByTitle?.id || ('imp-' + Math.random().toString(36).slice(2, 9));
         const rec = lookupBilingualTitle(id) || lookupBilingualTitle(raw.title);
@@ -691,17 +711,17 @@ function importLibraryJSON(file) {
           ? recTitle
           : raw.title;
 
-        byId.set(id, {
+        const mergedObj = {
           id,
           title:        recoveredTitle,
           titleEnglish: raw.titleEnglish || existingByTitle?.titleEnglish || recEng || '',
           titleRomaji:  raw.titleRomaji  || existingByTitle?.titleRomaji  || recRom || '',
-          category:     raw.category || existingByTitle?.category || 'Series & Anime',
+          category:     cat,
           status:       normalizeStatus(raw.status || existingByTitle?.status),
           rating:       Number(raw.rating ?? existingByTitle?.rating ?? 0),
           progress:     Number(raw.progress ?? existingByTitle?.progress ?? raw.totalUnits ?? 1),
           totalUnits:   Math.max(1, Number(raw.totalUnits || existingByTitle?.totalUnits || 12)),
-          unitName:     raw.unitName || existingByTitle?.unitName || 'eps',
+          unitName:     raw.unitName || existingByTitle?.unitName || (cat === 'Movies' ? 'movie' : cat === 'Books' ? 'chs' : cat === 'Games' ? 'hrs' : 'eps'),
           studio:       raw.studio && raw.studio !== 'Unknown Studio' ? raw.studio : (existingByTitle?.studio || 'Unknown Studio'),
           releaseDate:  raw.releaseDate && raw.releaseDate !== 'TBA' ? raw.releaseDate : (existingByTitle?.releaseDate || 'TBA'),
           consumedDate: raw.consumedDate || existingByTitle?.consumedDate || '',
@@ -712,7 +732,10 @@ function importLibraryJSON(file) {
           synopsis:     raw.synopsis || existingByTitle?.synopsis || '',
           notes:        raw.notes || existingByTitle?.notes || '',
           updatedAt:    raw.updatedAt || Date.now()
-        });
+        };
+
+        byId.set(id, mergedObj);
+        titleLookup.set(key, mergedObj);
       }
 
       state.items = Array.from(byId.values());
@@ -805,15 +828,34 @@ const CloudSync = {
         state.user = session.user;
         state.cloudStatus = 'connected';
         const remoteItems = await this.pull();
-        state.items = Array.isArray(remoteItems) ? remoteItems : [];
-        saveItems(false);
+        if (remoteItems === null) {
+          state.cloudStatus = navigator.onLine ? 'error' : 'offline';
+        } else if (Array.isArray(remoteItems)) {
+          if (state.items.length > 0 && remoteItems.length === 0) {
+            await this.push(state.items);
+          } else if (state.items.length > 0 && remoteItems.length > 0) {
+            state.items = mergeLibraries(state.items, remoteItems);
+            saveItems(false);
+            await this.push(state.items);
+          } else if (state.items.length === 0) {
+            state.items = remoteItems;
+            saveItems(false);
+          }
+        }
         this.subscribe();
+        this.flushOfflineQueue();
       } else {
         state.user = null;
         state.cloudStatus = 'offline';
         if (event === 'SIGNED_OUT') {
-          state.items = [];
-          saveItems(false);
+          if (!window._signingOutPromptHandled) {
+            const keepLocal = confirm('Keep a copy of your library on this device for offline guest use?');
+            if (!keepLocal) {
+              state.items = [];
+              saveItems(false);
+            }
+          }
+          window._signingOutPromptHandled = false;
         }
         if (this._realtimeChannel) {
           client.removeChannel(this._realtimeChannel);
@@ -857,12 +899,23 @@ const CloudSync = {
         state.user = session.user;
         state.cloudStatus = 'connected';
         const remoteItems = await this.pull();
-        if (Array.isArray(remoteItems) && remoteItems.length > 0) {
-          state.items = remoteItems;
-          saveItems(false);
+        if (remoteItems === null) {
+          state.cloudStatus = navigator.onLine ? 'error' : 'offline';
+        } else if (Array.isArray(remoteItems)) {
+          if (state.items.length > 0 && remoteItems.length === 0) {
+            await this.push(state.items);
+          } else if (state.items.length > 0 && remoteItems.length > 0) {
+            state.items = mergeLibraries(state.items, remoteItems);
+            saveItems(false);
+            await this.push(state.items);
+          } else if (state.items.length === 0) {
+            state.items = remoteItems;
+            saveItems(false);
+          }
           if (typeof renderAll === 'function') renderAll();
         }
         this.subscribe();
+        this.flushOfflineQueue();
       } else {
         state.user = null;
         state.cloudStatus = 'offline';
@@ -1028,13 +1081,49 @@ const CloudSync = {
     } catch (e) {}
   },
 
-  /** S4: Flush offline queue when network is restored */
+  /** Queue deleted IDs in localStorage when offline or delete fails */
+  queueOfflineDelete(ids) {
+    try {
+      const list = Array.isArray(ids) ? ids : [ids];
+      const raw = localStorage.getItem('omnichart_offline_delete_queue');
+      const queue = raw ? JSON.parse(raw) : [];
+      const set = new Set([...queue, ...list]);
+      localStorage.setItem('omnichart_offline_delete_queue', JSON.stringify(Array.from(set)));
+    } catch (e) {}
+  },
+
+  /** S4: Flush offline queues (deletes first, then upserts) when network is restored */
   async flushOfflineQueue() {
+    if (!navigator.onLine || !state.user) return;
+    const client = this.getClient();
+    if (!client) return;
+
+    // 1. Flush offline delete queue first
+    try {
+      const rawDel = localStorage.getItem('omnichart_offline_delete_queue');
+      if (rawDel) {
+        const pendingDel = JSON.parse(rawDel);
+        if (Array.isArray(pendingDel) && pendingDel.length > 0) {
+          const { error } = await client
+            .from(OMNICHART_CONFIG.supabase.tableName)
+            .delete()
+            .in('id', pendingDel)
+            .eq('user_id', state.user.id);
+          if (!error) {
+            localStorage.removeItem('omnichart_offline_delete_queue');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[CloudSync] Failed flushing offline deletes:', e);
+    }
+
+    // 2. Flush offline upsert queue
     try {
       const raw = localStorage.getItem('omnichart_offline_sync_queue');
       if (!raw) return;
       const pending = JSON.parse(raw);
-      if (Array.isArray(pending) && pending.length > 0 && navigator.onLine && state.user) {
+      if (Array.isArray(pending) && pending.length > 0) {
         state.cloudStatus = 'syncing';
         if (typeof renderAuthStatus === 'function') renderAuthStatus();
         const res = await this.push(pending);
@@ -1052,35 +1141,57 @@ const CloudSync = {
 
   /** Delete a single item from the cloud */
   async deleteItem(id) {
-    if (!state.user || !id) return;
+    if (!id) return;
+    if (!state.user || !navigator.onLine) {
+      this.queueOfflineDelete(id);
+      return;
+    }
     const client = this.getClient();
-    if (!client) return;
+    if (!client) {
+      this.queueOfflineDelete(id);
+      return;
+    }
     try {
       this._lastLocalPushTime = Date.now();
-      await client
+      const { error } = await client
         .from(OMNICHART_CONFIG.supabase.tableName)
         .delete()
         .eq('id', id)
         .eq('user_id', state.user.id);
+      if (error) {
+        this.queueOfflineDelete(id);
+      }
     } catch (err) {
       console.warn('[CloudSync] Delete exception:', err);
+      this.queueOfflineDelete(id);
     }
   },
 
   /** Delete multiple items from the cloud */
   async deleteItems(ids) {
-    if (!state.user || !Array.isArray(ids) || ids.length === 0) return;
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    if (!state.user || !navigator.onLine) {
+      this.queueOfflineDelete(ids);
+      return;
+    }
     const client = this.getClient();
-    if (!client) return;
+    if (!client) {
+      this.queueOfflineDelete(ids);
+      return;
+    }
     try {
       this._lastLocalPushTime = Date.now();
-      await client
+      const { error } = await client
         .from(OMNICHART_CONFIG.supabase.tableName)
         .delete()
         .in('id', ids)
         .eq('user_id', state.user.id);
+      if (error) {
+        this.queueOfflineDelete(ids);
+      }
     } catch (err) {
       console.warn('[CloudSync] Bulk delete exception:', err);
+      this.queueOfflineDelete(ids);
     }
   },
 
@@ -1174,9 +1285,24 @@ const CloudSync = {
             table: OMNICHART_CONFIG.supabase.tableName,
             filter: `user_id=eq.${state.user.id}`
           },
-          async () => {
+          async (payload) => {
             const timeSincePush = Date.now() - (CloudSync._lastLocalPushTime || 0);
             const isSelfPush = timeSincePush < 4000;
+
+            if (payload?.eventType === 'DELETE' && payload.old?.id) {
+              const delId = payload.old.id;
+              const idx = state.items.findIndex((i) => i.id === delId);
+              if (idx !== -1) {
+                state.items.splice(idx, 1);
+                saveItems(false);
+                if (typeof renderAll === 'function') renderAll();
+                if (!isSelfPush && typeof showToast === 'function') {
+                  showToast('⚡ Item removed on another device');
+                }
+              }
+              return;
+            }
+
             const remoteItems = await this.pull();
             if (remoteItems) {
               // S3: Merge with last-write-wins
